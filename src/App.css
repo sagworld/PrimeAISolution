@@ -303,6 +303,25 @@ button {
   gap: 17px;
 }
 
+.ui-language-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #849091;
+  font-size: 10px;
+}
+
+.ui-language-picker select {
+  min-width: 88px;
+  height: 34px;
+  padding: 0 7px;
+  border: 1px solid #e8edef;
+  border-radius: 7px;
+  background: #fff;
+  color: #364546;
+  font-size: 11px;
+}
+
 .global-search,
 .table-search {
   display: flex;
@@ -2071,7 +2090,22 @@ kbd {
   }
 
   .topbar-actions {
-    gap: 9px;
+    gap: 7px;
+  }
+
+  .ui-language-picker {
+    gap: 0;
+  }
+
+  .ui-language-picker span {
+    display: none;
+  }
+
+  .ui-language-picker select {
+    min-width: 76px;
+    height: 32px;
+    padding: 0 4px;
+    font-size: 10px;
   }
 
   .global-search {
