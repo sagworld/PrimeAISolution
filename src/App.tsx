@@ -2,23 +2,28 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 're
 import './App.css'
 
 type Section = 'overview' | 'masters' | 'patients' | 'results' | 'report-generation' | 'reports'
-type MasterTab = 'doctors' | 'referrers' | 'tests'
+type MasterTab = 'lab-technicians' | 'referrers' | 'sample-collectors' | 'tests'
 type ReportPeriod = 'Daily' | 'Weekly' | 'Monthly'
 type OrderStatus = 'Pending' | 'Completed'
+type OrderStatusFilter = 'All' | OrderStatus
 type ExplanationLanguage = 'Marathi' | 'English' | 'Hindi'
 
-type Doctor = { id: string; name: string; specialty: string; phone: string }
+type LabTechnician = { id: string; name: string; specialty: string; phone: string }
 type Referrer = { id: string; name: string; organization: string; phone: string }
+type SampleCollector = { id: string; name: string; phone: string }
 type Patient = {
   id: string
   name: string
   age: number
   gender: string
   phone: string
-  doctorId: string
+  labTechnicianId: string
+  sampleCollectorId: string
   referrerId: string
   createdAt: string
 }
+type PersistedPatient = Omit<Patient, 'labTechnicianId' | 'sampleCollectorId'> &
+  Partial<Pick<Patient, 'labTechnicianId' | 'sampleCollectorId'>> & { doctorId?: string }
 type TestParameter = { id: string; name: string; unit: string; reference?: string }
 type LabTest = {
   id: string
@@ -39,8 +44,9 @@ type LabOrder = {
   status: OrderStatus
 }
 type Store = {
-  doctors: Doctor[]
+  labTechnicians: LabTechnician[]
   referrers: Referrer[]
+  sampleCollectors: SampleCollector[]
   patients: Patient[]
   tests: LabTest[]
   orders: LabOrder[]
@@ -69,21 +75,25 @@ function daysAgo(days: number) {
 }
 
 const initialStore: Store = {
-  doctors: [
-    { id: 'dr-1', name: 'Dr. Ananya Rao', specialty: 'General Medicine', phone: '+91 98765 43210' },
-    { id: 'dr-2', name: 'Dr. Karan Mehta', specialty: 'Cardiology', phone: '+91 98765 43211' },
-    { id: 'dr-3', name: 'Dr. Sana Iyer', specialty: 'Endocrinology', phone: '+91 98765 43212' },
+  labTechnicians: [
+    { id: 'tech-1', name: 'Ananya Rao', specialty: 'Hematology', phone: '+91 98765 43210' },
+    { id: 'tech-2', name: 'Karan Mehta', specialty: 'Biochemistry', phone: '+91 98765 43211' },
+    { id: 'tech-3', name: 'Sana Iyer', specialty: 'Immunology', phone: '+91 98765 43212' },
   ],
   referrers: [
     { id: 'ref-1', name: 'Dr. Vivek Shah', organization: 'Greenfield Clinic', phone: '+91 98765 43213' },
     { id: 'ref-2', name: 'Dr. Meera Nair', organization: 'City Care Centre', phone: '+91 98765 43214' },
   ],
+  sampleCollectors: [
+    { id: 'collector-1', name: 'Priya Menon', phone: '+91 98765 43215' },
+    { id: 'collector-2', name: 'Rahul Desai', phone: '+91 98765 43216' },
+  ],
   patients: [
-    { id: 'PT-2401', name: 'Aarav Sharma', age: 34, gender: 'Male', phone: '+91 98100 11001', doctorId: 'dr-1', referrerId: 'ref-1', createdAt: daysAgo(0) },
-    { id: 'PT-2402', name: 'Diya Patel', age: 28, gender: 'Female', phone: '+91 98100 11002', doctorId: 'dr-2', referrerId: 'ref-2', createdAt: daysAgo(0) },
-    { id: 'PT-2403', name: 'Kabir Verma', age: 46, gender: 'Male', phone: '+91 98100 11003', doctorId: 'dr-1', referrerId: 'ref-1', createdAt: daysAgo(1) },
-    { id: 'PT-2404', name: 'Anika Das', age: 52, gender: 'Female', phone: '+91 98100 11004', doctorId: 'dr-3', referrerId: 'ref-2', createdAt: daysAgo(2) },
-    { id: 'PT-2405', name: 'Rohan Kapoor', age: 39, gender: 'Male', phone: '+91 98100 11005', doctorId: 'dr-2', referrerId: 'ref-1', createdAt: daysAgo(3) },
+    { id: 'PT-2401', name: 'Aarav Sharma', age: 34, gender: 'Male', phone: '+91 98100 11001', labTechnicianId: 'tech-1', sampleCollectorId: 'collector-1', referrerId: 'ref-1', createdAt: daysAgo(0) },
+    { id: 'PT-2402', name: 'Diya Patel', age: 28, gender: 'Female', phone: '+91 98100 11002', labTechnicianId: 'tech-2', sampleCollectorId: 'collector-2', referrerId: 'ref-2', createdAt: daysAgo(0) },
+    { id: 'PT-2403', name: 'Kabir Verma', age: 46, gender: 'Male', phone: '+91 98100 11003', labTechnicianId: 'tech-1', sampleCollectorId: 'collector-1', referrerId: 'ref-1', createdAt: daysAgo(1) },
+    { id: 'PT-2404', name: 'Anika Das', age: 52, gender: 'Female', phone: '+91 98100 11004', labTechnicianId: 'tech-3', sampleCollectorId: 'collector-2', referrerId: 'ref-2', createdAt: daysAgo(2) },
+    { id: 'PT-2405', name: 'Rohan Kapoor', age: 39, gender: 'Male', phone: '+91 98100 11005', labTechnicianId: 'tech-2', sampleCollectorId: 'collector-1', referrerId: 'ref-1', createdAt: daysAgo(3) },
   ],
   tests: [
     { id: 'test-1', name: 'CBC – Complete Blood Count', category: 'Hematology', price: 450, unit: 'g/dL', reference: '12.0–17.5', parameters: cbcParameters },
@@ -112,18 +122,31 @@ function readStore(): Store {
     if (
       typeof parsed === 'object' &&
       parsed !== null &&
-      'doctors' in parsed &&
       'referrers' in parsed &&
       'patients' in parsed &&
       'tests' in parsed &&
       'orders' in parsed &&
-      Array.isArray(parsed.doctors) &&
       Array.isArray(parsed.referrers) &&
       Array.isArray(parsed.patients) &&
       Array.isArray(parsed.tests) &&
-      Array.isArray(parsed.orders)
+      Array.isArray(parsed.orders) &&
+      (('labTechnicians' in parsed && Array.isArray(parsed.labTechnicians)) ||
+        ('doctors' in parsed && Array.isArray(parsed.doctors)))
     ) {
-      const savedStore = parsed as Store
+      const savedStore = parsed as Omit<Partial<Store>, 'patients'> & {
+        doctors?: LabTechnician[]
+        patients: PersistedPatient[]
+        referrers: Referrer[]
+        tests: LabTest[]
+        orders: LabOrder[]
+      }
+      const labTechnicians = savedStore.labTechnicians ?? savedStore.doctors ?? initialStore.labTechnicians
+      const sampleCollectors = savedStore.sampleCollectors ?? initialStore.sampleCollectors
+      const patients = savedStore.patients.map((patient) => ({
+        ...patient,
+        labTechnicianId: patient.labTechnicianId ?? patient.doctorId ?? '',
+        sampleCollectorId: patient.sampleCollectorId ?? '',
+      }))
       const tests = initialStore.tests.map((defaultTest) => {
         const savedTest = savedStore.tests.find((test) => test.id === defaultTest.id)
         return savedTest
@@ -144,7 +167,7 @@ function readStore(): Store {
           status: order.status === 'Completed' && !hasAllParameters ? 'Pending' as const : order.status,
         }
       })
-      return { ...savedStore, tests, orders }
+      return { labTechnicians, referrers: savedStore.referrers, sampleCollectors, patients, tests, orders }
     }
   } catch (error) {
     console.error('Unable to load saved lab data.', error)
@@ -215,8 +238,12 @@ function getParameterResult(order: LabOrder, parameter: TestParameter) {
   return order.parameterResults?.[parameter.id] ?? (parameter.id === order.testId ? order.result : '')
 }
 
-function getDoctor(store: Store, id: string) {
-  return store.doctors.find((doctor) => doctor.id === id)?.name ?? '—'
+function getLabTechnician(store: Store, id: string) {
+  return store.labTechnicians.find((technician) => technician.id === id)?.name ?? '—'
+}
+
+function getSampleCollector(store: Store, id: string) {
+  return store.sampleCollectors.find((collector) => collector.id === id)?.name ?? '—'
 }
 
 function getReferrer(store: Store, id: string) {
@@ -240,8 +267,9 @@ function Dialog({ title, onClose, children, className = '' }: { title: string; o
 function App() {
   const [store, setStore] = useState<Store>(readStore)
   const [section, setSection] = useState<Section>('overview')
-  const [masterTab, setMasterTab] = useState<MasterTab>('doctors')
+  const [masterTab, setMasterTab] = useState<MasterTab>('lab-technicians')
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('Daily')
+  const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatusFilter>('All')
   const [search, setSearch] = useState('')
   const [patientDialog, setPatientDialog] = useState(false)
   const [testDialog, setTestDialog] = useState(false)
@@ -255,8 +283,9 @@ function App() {
   const [aiError, setAiError] = useState('')
   const [selectedPatientId, setSelectedPatientId] = useState('')
   const [selectedTestIds, setSelectedTestIds] = useState<string[]>([])
-  const [patientDraft, setPatientDraft] = useState({ name: '', age: '', gender: 'Female', phone: '', doctorId: '', referrerId: '' })
-  const [masterDraft, setMasterDraft] = useState({ name: '', specialty: '', organization: '', phone: '', category: '', price: '', unit: '', reference: '' })
+  const [patientDraft, setPatientDraft] = useState({ name: '', age: '', gender: 'Female', phone: '', labTechnicianId: '', sampleCollectorId: '', referrerId: '' })
+  const [masterDraft, setMasterDraft] = useState({ name: '', specialty: '', organization: '', phone: '', category: '', price: '' })
+  const [parameterDrafts, setParameterDrafts] = useState([{ name: '', unit: '', reference: '' }])
   const [resultDrafts, setResultDrafts] = useState<Record<string, string>>({})
   const [toast, setToast] = useState('')
 
@@ -349,7 +378,8 @@ function App() {
     const term = search.trim().toLowerCase()
     if (!term) return store.patients
     return store.patients.filter((patient) =>
-      [patient.id, patient.name, patient.phone, getDoctor(store, patient.doctorId)].some((value) => value.toLowerCase().includes(term)),
+      [patient.id, patient.name, patient.phone, getLabTechnician(store, patient.labTechnicianId), getSampleCollector(store, patient.sampleCollectorId)]
+        .some((value) => value.toLowerCase().includes(term)),
     )
   }, [search, store])
 
@@ -358,9 +388,10 @@ function App() {
     return store.orders.filter((order) => {
       const patient = store.patients.find((item) => item.id === order.patientId)
       const test = getTest(store, order.testId)
-      return !term || [order.id, patient?.name ?? '', patient?.id ?? '', test?.name ?? ''].some((value) => value.toLowerCase().includes(term))
+      const matchesSearch = !term || [order.id, patient?.name ?? '', patient?.id ?? '', test?.name ?? ''].some((value) => value.toLowerCase().includes(term))
+      return matchesSearch && (orderStatusFilter === 'All' || order.status === orderStatusFilter)
     })
-  }, [search, store])
+  }, [orderStatusFilter, search, store])
 
   const pendingCount = store.orders.filter((order) => order.status === 'Pending').length
   const todayCount = store.orders.filter((order) => new Date(order.createdAt).toDateString() === new Date().toDateString()).length
@@ -385,6 +416,12 @@ function App() {
     setTestDialog(true)
   }
 
+  const openMasterDialog = (tab: MasterTab) => {
+    setMasterDraft({ name: '', specialty: '', organization: '', phone: '', category: '', price: '' })
+    setParameterDrafts([{ name: '', unit: '', reference: '' }])
+    setMasterDialog(tab)
+  }
+
   const addPatient = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const patient: Patient = {
@@ -393,12 +430,13 @@ function App() {
       age: Number(patientDraft.age),
       gender: patientDraft.gender,
       phone: patientDraft.phone.trim(),
-      doctorId: patientDraft.doctorId,
+      labTechnicianId: patientDraft.labTechnicianId,
+      sampleCollectorId: patientDraft.sampleCollectorId,
       referrerId: patientDraft.referrerId,
       createdAt: new Date().toISOString(),
     }
     persist({ ...store, patients: [patient, ...store.patients] })
-    setPatientDraft({ name: '', age: '', gender: 'Female', phone: '', doctorId: '', referrerId: '' })
+    setPatientDraft({ name: '', age: '', gender: 'Female', phone: '', labTechnicianId: '', sampleCollectorId: '', referrerId: '' })
     setPatientDialog(false)
     notify('Patient registered successfully.')
   }
@@ -431,15 +469,37 @@ function App() {
 
   const addMaster = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (masterDialog === 'doctors') {
-      persist({ ...store, doctors: [{ id: makeId('dr'), name: masterDraft.name.trim(), specialty: masterDraft.specialty.trim(), phone: masterDraft.phone.trim() }, ...store.doctors] })
+    if (masterDialog === 'lab-technicians') {
+      persist({ ...store, labTechnicians: [{ id: makeId('tech'), name: masterDraft.name.trim(), specialty: masterDraft.specialty.trim(), phone: masterDraft.phone.trim() }, ...store.labTechnicians] })
     } else if (masterDialog === 'referrers') {
       persist({ ...store, referrers: [{ id: makeId('ref'), name: masterDraft.name.trim(), organization: masterDraft.organization.trim(), phone: masterDraft.phone.trim() }, ...store.referrers] })
+    } else if (masterDialog === 'sample-collectors') {
+      persist({ ...store, sampleCollectors: [{ id: makeId('collector'), name: masterDraft.name.trim(), phone: masterDraft.phone.trim() }, ...store.sampleCollectors] })
     } else if (masterDialog === 'tests') {
-      persist({ ...store, tests: [{ id: makeId('test'), name: masterDraft.name.trim(), category: masterDraft.category.trim(), price: Number(masterDraft.price), unit: masterDraft.unit.trim(), reference: masterDraft.reference.trim() }, ...store.tests] })
+      const parameters = parameterDrafts.map((parameter, index) => ({
+        id: `${makeId('parameter')}-${index + 1}`,
+        name: parameter.name.trim(),
+        unit: parameter.unit.trim(),
+        reference: parameter.reference.trim(),
+      })).filter((parameter) => parameter.name)
+      if (!parameters.length) {
+        notify('Add at least one named test parameter.')
+        return
+      }
+      const test: LabTest = {
+        id: makeId('test'),
+        name: masterDraft.name.trim(),
+        category: masterDraft.category.trim(),
+        price: Number(masterDraft.price),
+        unit: '',
+        reference: '',
+        parameters,
+      }
+      persist({ ...store, tests: [test, ...store.tests] })
     }
     setMasterDialog(null)
-    setMasterDraft({ name: '', specialty: '', organization: '', phone: '', category: '', price: '', unit: '', reference: '' })
+    setMasterDraft({ name: '', specialty: '', organization: '', phone: '', category: '', price: '' })
+    setParameterDrafts([{ name: '', unit: '', reference: '' }])
     notify('Master record added.')
   }
 
@@ -463,6 +523,12 @@ function App() {
   const generationOrders = generationPatientId
     ? store.orders.filter((order) => order.patientId === generationPatientId)
     : []
+  const masterTabDetails: Record<MasterTab, { label: string; singular: string; count: number }> = {
+    'lab-technicians': { label: 'Lab technicians', singular: 'lab technician', count: store.labTechnicians.length },
+    referrers: { label: 'Referrers', singular: 'referrer', count: store.referrers.length },
+    'sample-collectors': { label: 'Sample collectors', singular: 'sample collector', count: store.sampleCollectors.length },
+    tests: { label: 'Test catalogue', singular: 'test', count: store.tests.length },
+  }
 
   const generateAiInterpretation = async () => {
     setAiLoading(true)
@@ -600,15 +666,16 @@ function App() {
 
           {section === 'masters' && (
             <section className="page-section">
-              <div className="page-heading"><div><span className="eyebrow">CONFIGURATION</span><h1>Masters</h1><p>Manage doctors, referral partners and your test catalogue.</p></div><button className="button button-primary" onClick={() => setMasterDialog(masterTab)}><Icon name="plus" size={17} /> Add {masterTab === 'doctors' ? 'doctor' : masterTab === 'referrers' ? 'referrer' : 'test'}</button></div>
+              <div className="page-heading"><div><span className="eyebrow">CONFIGURATION</span><h1>Masters</h1><p>Manage lab technicians, referral partners, sample collectors and tests.</p></div><button className="button button-primary" onClick={() => openMasterDialog(masterTab)}><Icon name="plus" size={17} /> Add {masterTabDetails[masterTab].singular}</button></div>
               <div className="tab-bar">
-                {([['doctors', 'Doctors'], ['referrers', 'Referrers'], ['tests', 'Test catalogue']] as const).map(([key, label]) => <button key={key} className={masterTab === key ? 'selected' : ''} onClick={() => setMasterTab(key)}>{label}<span>{key === 'doctors' ? store.doctors.length : key === 'referrers' ? store.referrers.length : store.tests.length}</span></button>)}
+                {(['lab-technicians', 'referrers', 'sample-collectors', 'tests'] as const).map((key) => <button key={key} className={masterTab === key ? 'selected' : ''} onClick={() => setMasterTab(key)}>{masterTabDetails[key].label}<span>{masterTabDetails[key].count}</span></button>)}
               </div>
               <div className="panel list-panel">
-                {masterTab === 'doctors' && <table><thead><tr><th>DOCTOR</th><th>SPECIALTY</th><th>PHONE</th><th>REFERRED PATIENTS</th><th /></tr></thead><tbody>{store.doctors.filter((doctor) => !search || `${doctor.name} ${doctor.specialty} ${doctor.phone}`.toLowerCase().includes(search.toLowerCase())).map((doctor, index) => <tr key={doctor.id}><td><div className="person-cell"><span className={`avatar avatar-${index % 4}`}>{doctor.name.split(' ').slice(-1)[0].slice(0, 1)}</span><strong>{doctor.name}</strong></div></td><td>{doctor.specialty}</td><td>{doctor.phone || '—'}</td><td>{store.patients.filter((patient) => patient.doctorId === doctor.id).length} patients</td><td><button className="row-action" aria-label={`Add patient for ${doctor.name}`} onClick={() => { setPatientDraft({ ...patientDraft, doctorId: doctor.id }); setPatientDialog(true) }}>•••</button></td></tr>)}</tbody></table>}
+                {masterTab === 'lab-technicians' && <table><thead><tr><th>LAB TECHNICIAN</th><th>DEPARTMENT / SPECIALTY</th><th>PHONE</th><th>ASSIGNED PATIENTS</th><th /></tr></thead><tbody>{store.labTechnicians.filter((technician) => !search || `${technician.name} ${technician.specialty} ${technician.phone}`.toLowerCase().includes(search.toLowerCase())).map((technician, index) => <tr key={technician.id}><td><div className="person-cell"><span className={`avatar avatar-${index % 4}`}>{technician.name.split(' ').slice(-1)[0].slice(0, 1)}</span><strong>{technician.name}</strong></div></td><td>{technician.specialty}</td><td>{technician.phone || '—'}</td><td>{store.patients.filter((patient) => patient.labTechnicianId === technician.id).length} patients</td><td><button className="row-action" aria-label={`Add patient for ${technician.name}`} onClick={() => { setPatientDraft({ name: '', age: '', gender: 'Female', phone: '', labTechnicianId: technician.id, sampleCollectorId: '', referrerId: '' }); setPatientDialog(true) }}>•••</button></td></tr>)}</tbody></table>}
                 {masterTab === 'referrers' && <table><thead><tr><th>REFERRAL PARTNER</th><th>ORGANIZATION</th><th>PHONE</th><th>REFERRED PATIENTS</th><th /></tr></thead><tbody>{store.referrers.filter((referrer) => !search || `${referrer.name} ${referrer.organization} ${referrer.phone}`.toLowerCase().includes(search.toLowerCase())).map((referrer, index) => <tr key={referrer.id}><td><div className="person-cell"><span className={`avatar avatar-${(index + 2) % 4}`}>{referrer.name.split(' ').slice(-1)[0].slice(0, 1)}</span><strong>{referrer.name}</strong></div></td><td>{referrer.organization}</td><td>{referrer.phone || '—'}</td><td>{store.patients.filter((patient) => patient.referrerId === referrer.id).length} patients</td><td><button className="row-action" aria-label={`Referral partner actions for ${referrer.name}`}>•••</button></td></tr>)}</tbody></table>}
-                {masterTab === 'tests' && <table><thead><tr><th>TEST NAME</th><th>CATEGORY</th><th>PRICE</th><th>UNIT</th><th>REFERENCE RANGE</th><th /></tr></thead><tbody>{store.tests.filter((test) => !search || `${test.name} ${test.category}`.toLowerCase().includes(search.toLowerCase())).map((test) => <tr key={test.id}><td><div className="test-name-cell"><span className="test-row-icon"><Icon name="flask" size={16} /></span><strong>{test.name}</strong></div></td><td><span className="category-tag">{test.category}</span></td><td>₹{test.price.toLocaleString('en-IN')}</td><td>{test.unit}</td><td>{test.reference}</td><td><button className="row-action" aria-label={`Actions for ${test.name}`}>•••</button></td></tr>)}</tbody></table>}
-                <div className="table-footer"><span>Showing {masterTab === 'doctors' ? store.doctors.length : masterTab === 'referrers' ? store.referrers.length : store.tests.length} records</span><span>Demo data is stored in this browser</span></div>
+                {masterTab === 'sample-collectors' && <table><thead><tr><th>SAMPLE COLLECTOR</th><th>PHONE</th><th>ASSIGNED PATIENTS</th><th /></tr></thead><tbody>{store.sampleCollectors.filter((collector) => !search || `${collector.name} ${collector.phone}`.toLowerCase().includes(search.toLowerCase())).map((collector, index) => <tr key={collector.id}><td><div className="person-cell"><span className={`avatar avatar-${index % 4}`}>{collector.name.split(' ').slice(-1)[0].slice(0, 1)}</span><strong>{collector.name}</strong></div></td><td>{collector.phone || '—'}</td><td>{store.patients.filter((patient) => patient.sampleCollectorId === collector.id).length} patients</td><td><button className="row-action" aria-label={`Add patient for ${collector.name}`} onClick={() => { setPatientDraft({ name: '', age: '', gender: 'Female', phone: '', labTechnicianId: '', sampleCollectorId: collector.id, referrerId: '' }); setPatientDialog(true) }}>•••</button></td></tr>)}</tbody></table>}
+                {masterTab === 'tests' && <table><thead><tr><th>TEST NAME</th><th>CATEGORY</th><th>PRICE</th><th>PARAMETERS</th><th /></tr></thead><tbody>{store.tests.filter((test) => !search || `${test.name} ${test.category} ${test.parameters?.map((parameter) => parameter.name).join(' ') ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((test) => <tr key={test.id}><td><div className="test-name-cell"><span className="test-row-icon"><Icon name="flask" size={16} /></span><strong>{test.name}</strong></div></td><td><span className="category-tag">{test.category}</span></td><td>₹{test.price.toLocaleString('en-IN')}</td><td>{test.parameters?.length ? test.parameters.map((parameter) => parameter.name).join(', ') : `Result${test.unit ? ` · ${test.unit}` : ''}${test.reference ? ` · ${test.reference}` : ''}`}</td><td><button className="row-action" aria-label={`Actions for ${test.name}`}>•••</button></td></tr>)}</tbody></table>}
+                <div className="table-footer"><span>Showing {masterTabDetails[masterTab].count} records</span><span>Demo data is stored in this browser</span></div>
               </div>
             </section>
           )}
@@ -619,9 +686,9 @@ function App() {
               <div className="patient-summary-row"><div className="patient-summary"><span className="stat-icon mint"><Icon name="patients" /></span><span><small>Total patients</small><strong>{store.patients.length}</strong></span></div><div className="patient-summary"><span className="stat-icon violet"><Icon name="flask" /></span><span><small>Tests on record</small><strong>{store.orders.length}</strong></span></div><div className="patient-summary"><span className="stat-icon amber"><Icon name="clock" /></span><span><small>Awaiting results</small><strong>{pendingCount}</strong></span></div></div>
               <div className="panel list-panel">
                 <div className="list-toolbar"><div><h2>All patients</h2><p>A complete record of registered patients.</p></div><label className="table-search"><Icon name="search" size={16} /><input aria-label="Filter patient list" placeholder="Filter patients" value={search} onChange={(event) => setSearch(event.target.value)} /></label></div>
-                <table><thead><tr><th>PATIENT</th><th>PATIENT ID</th><th>AGE / GENDER</th><th>PHONE</th><th>DOCTOR</th><th>TESTS</th><th>REGISTERED</th><th /></tr></thead><tbody>
-                  {filteredPatients.map((patient, index) => <tr key={patient.id}><td><div className="person-cell"><span className={`avatar avatar-${index % 4}`}>{patient.name.split(' ').map((word) => word[0]).slice(0, 2).join('')}</span><strong>{patient.name}</strong></div></td><td><span className="id-text">{patient.id}</span></td><td>{patient.age} yrs <span className="muted">/ {patient.gender}</span></td><td>{patient.phone}</td><td>{getDoctor(store, patient.doctorId)}</td><td><span className="test-count">{store.orders.filter((order) => order.patientId === patient.id).length}</span></td><td>{formatDate(patient.createdAt)}</td><td><button className="button button-small button-outline" onClick={() => openTestDialog(patient.id)}><Icon name="plus" size={14} /> Add test</button></td></tr>)}
-                  {!filteredPatients.length && <tr><td className="empty-cell" colSpan={8}>No patients match your search.</td></tr>}
+                <table><thead><tr><th>PATIENT</th><th>PATIENT ID</th><th>AGE / GENDER</th><th>PHONE</th><th>LAB TECHNICIAN</th><th>SAMPLE COLLECTOR</th><th>TESTS</th><th>REGISTERED</th><th /></tr></thead><tbody>
+                  {filteredPatients.map((patient, index) => <tr key={patient.id}><td><div className="person-cell"><span className={`avatar avatar-${index % 4}`}>{patient.name.split(' ').map((word) => word[0]).slice(0, 2).join('')}</span><strong>{patient.name}</strong></div></td><td><span className="id-text">{patient.id}</span></td><td>{patient.age} yrs <span className="muted">/ {patient.gender}</span></td><td>{patient.phone}</td><td>{getLabTechnician(store, patient.labTechnicianId)}</td><td>{getSampleCollector(store, patient.sampleCollectorId)}</td><td><span className="test-count">{store.orders.filter((order) => order.patientId === patient.id).length}</span></td><td>{formatDate(patient.createdAt)}</td><td><button className="button button-small button-outline" onClick={() => openTestDialog(patient.id)}><Icon name="plus" size={14} /> Add test</button></td></tr>)}
+                  {!filteredPatients.length && <tr><td className="empty-cell" colSpan={9}>No patients match your search.</td></tr>}
                 </tbody></table>
                 <div className="table-footer"><span>Showing {filteredPatients.length} of {store.patients.length} patients</span><span>Page 1 of 1</span></div>
               </div>
@@ -633,7 +700,7 @@ function App() {
               <div className="page-heading"><div><span className="eyebrow">LAB WORKFLOW</span><h1>Test results</h1><p>Enter and review results, then prepare a patient report.</p></div><button className="button button-primary" onClick={() => openTestDialog()}><Icon name="plus" size={17} /> Add test order</button></div>
               <div className="result-cards"><div className="result-card"><span className="result-number">{store.orders.length}</span><span>Total orders</span></div><div className="result-card"><span className="result-number">{pendingCount}</span><span><i className="legend-dot amber-dot" /> Pending</span></div><div className="result-card"><span className="result-number">{completedCount}</span><span><i className="legend-dot green-dot" /> Completed</span></div></div>
               <div className="panel list-panel">
-                <div className="list-toolbar"><div><h2>Test queue</h2><p>Results are entered and saved in this browser.</p></div><label className="table-search"><Icon name="search" size={16} /><input aria-label="Filter test orders" placeholder="Filter tests" value={search} onChange={(event) => setSearch(event.target.value)} /></label></div>
+                <div className="list-toolbar"><div><h2>Test queue</h2><p>Results are entered and saved in this browser.</p></div><div className="result-list-controls"><label className="status-filter">Status<select aria-label="Filter tests by status" value={orderStatusFilter} onChange={(event) => setOrderStatusFilter(event.target.value as OrderStatusFilter)}><option value="All">All</option><option value="Pending">Pending</option><option value="Completed">Completed</option></select></label><label className="table-search"><Icon name="search" size={16} /><input aria-label="Filter test orders" placeholder="Filter tests" value={search} onChange={(event) => setSearch(event.target.value)} /></label></div></div>
                 <table><thead><tr><th>ORDER / PATIENT</th><th>TEST</th><th>ORDERED</th><th>RESULT</th><th>REFERENCE</th><th>STATUS</th><th>ACTIONS</th></tr></thead><tbody>
                   {filteredOrders.map((order) => {
                     const test = getTest(store, order.testId)
@@ -736,7 +803,8 @@ function App() {
           <label>Full name<input required autoFocus value={patientDraft.name} onChange={(event) => setPatientDraft({ ...patientDraft, name: event.target.value })} placeholder="e.g. Maya Sharma" /></label>
           <div className="form-row"><label>Age<input required type="number" min="0" max="120" value={patientDraft.age} onChange={(event) => setPatientDraft({ ...patientDraft, age: event.target.value })} placeholder="Age" /></label><label>Gender<select value={patientDraft.gender} onChange={(event) => setPatientDraft({ ...patientDraft, gender: event.target.value })}><option>Female</option><option>Male</option><option>Other</option><option>Prefer not to say</option></select></label></div>
           <label>Phone number<input required value={patientDraft.phone} onChange={(event) => setPatientDraft({ ...patientDraft, phone: event.target.value })} placeholder="+91 00000 00000" /></label>
-          <div className="form-row"><label>Doctor<select value={patientDraft.doctorId} onChange={(event) => setPatientDraft({ ...patientDraft, doctorId: event.target.value })}><option value="">Select doctor</option>{store.doctors.map((doctor) => <option key={doctor.id} value={doctor.id}>{doctor.name}</option>)}</select></label><label>Referred by<select value={patientDraft.referrerId} onChange={(event) => setPatientDraft({ ...patientDraft, referrerId: event.target.value })}><option value="">Select referrer</option>{store.referrers.map((referrer) => <option key={referrer.id} value={referrer.id}>{referrer.name}</option>)}</select></label></div>
+          <div className="form-row"><label>Lab technician<select value={patientDraft.labTechnicianId} onChange={(event) => setPatientDraft({ ...patientDraft, labTechnicianId: event.target.value })}><option value="">Select lab technician</option>{store.labTechnicians.map((technician) => <option key={technician.id} value={technician.id}>{technician.name}</option>)}</select></label><label>Sample collector<select value={patientDraft.sampleCollectorId} onChange={(event) => setPatientDraft({ ...patientDraft, sampleCollectorId: event.target.value })}><option value="">Select sample collector</option>{store.sampleCollectors.map((collector) => <option key={collector.id} value={collector.id}>{collector.name}</option>)}</select></label></div>
+          <label>Referred by<select value={patientDraft.referrerId} onChange={(event) => setPatientDraft({ ...patientDraft, referrerId: event.target.value })}><option value="">Select referrer</option>{store.referrers.map((referrer) => <option key={referrer.id} value={referrer.id}>{referrer.name}</option>)}</select></label>
           <div className="dialog-actions"><button type="button" className="button button-outline" onClick={() => setPatientDialog(false)}>Cancel</button><button type="submit" className="button button-primary">Register patient</button></div>
         </form>
       </Dialog>}
@@ -752,12 +820,23 @@ function App() {
         </form>
       </Dialog>}
 
-      {masterDialog && <Dialog title={`Add ${masterDialog === 'doctors' ? 'doctor' : masterDialog === 'referrers' ? 'referral partner' : 'test'}`} onClose={() => setMasterDialog(null)}>
+      {masterDialog && <Dialog title={`Add ${masterTabDetails[masterDialog].singular}`} onClose={() => setMasterDialog(null)} className={masterDialog === 'tests' ? 'test-master-dialog' : ''}>
         <form className="dialog-form" onSubmit={addMaster}>
-          <label>{masterDialog === 'tests' ? 'Test name' : 'Full name'}<input required autoFocus value={masterDraft.name} onChange={(event) => setMasterDraft({ ...masterDraft, name: event.target.value })} placeholder={masterDialog === 'tests' ? 'e.g. Vitamin D' : 'e.g. Dr. Maya Rao'} /></label>
-          {masterDialog === 'doctors' && <label>Specialty<input required value={masterDraft.specialty} onChange={(event) => setMasterDraft({ ...masterDraft, specialty: event.target.value })} placeholder="e.g. General Medicine" /></label>}
+          <label>{masterDialog === 'tests' ? 'Test name' : 'Full name'}<input required autoFocus value={masterDraft.name} onChange={(event) => setMasterDraft({ ...masterDraft, name: event.target.value })} placeholder={masterDialog === 'tests' ? 'e.g. Vitamin D' : 'e.g. Maya Rao'} /></label>
+          {masterDialog === 'lab-technicians' && <label>Department / specialty<input required value={masterDraft.specialty} onChange={(event) => setMasterDraft({ ...masterDraft, specialty: event.target.value })} placeholder="e.g. Hematology" /></label>}
           {masterDialog === 'referrers' && <label>Organization<input required value={masterDraft.organization} onChange={(event) => setMasterDraft({ ...masterDraft, organization: event.target.value })} placeholder="Clinic or hospital" /></label>}
-          {masterDialog === 'tests' && <><div className="form-row"><label>Category<input required value={masterDraft.category} onChange={(event) => setMasterDraft({ ...masterDraft, category: event.target.value })} placeholder="e.g. Biochemistry" /></label><label>Price (₹)<input required type="number" min="0" value={masterDraft.price} onChange={(event) => setMasterDraft({ ...masterDraft, price: event.target.value })} placeholder="0" /></label></div><div className="form-row"><label>Result unit<input required value={masterDraft.unit} onChange={(event) => setMasterDraft({ ...masterDraft, unit: event.target.value })} placeholder="e.g. mg/dL" /></label><label>Reference range<input required value={masterDraft.reference} onChange={(event) => setMasterDraft({ ...masterDraft, reference: event.target.value })} placeholder="e.g. 70–100" /></label></div></>}
+          {masterDialog === 'tests' && <>
+            <div className="form-row"><label>Category<input required value={masterDraft.category} onChange={(event) => setMasterDraft({ ...masterDraft, category: event.target.value })} placeholder="e.g. Biochemistry" /></label><label>Price (₹)<input required type="number" min="0" value={masterDraft.price} onChange={(event) => setMasterDraft({ ...masterDraft, price: event.target.value })} placeholder="0" /></label></div>
+            <div className="test-parameter-editor">
+              <div className="parameter-editor-heading"><strong>Test parameters</strong><button type="button" className="button button-small button-outline" onClick={() => setParameterDrafts((drafts) => [...drafts, { name: '', unit: '', reference: '' }])}><Icon name="plus" size={13} /> Add parameter</button></div>
+              {parameterDrafts.map((parameter, index) => <div className="parameter-draft-row" key={index}>
+                <label>Parameter name<input required value={parameter.name} onChange={(event) => setParameterDrafts((drafts) => drafts.map((draft, row) => row === index ? { ...draft, name: event.target.value } : draft))} placeholder="e.g. Hemoglobin" /></label>
+                <label>Unit<input value={parameter.unit} onChange={(event) => setParameterDrafts((drafts) => drafts.map((draft, row) => row === index ? { ...draft, unit: event.target.value } : draft))} placeholder="e.g. g/dL" /></label>
+                <label>Reference range<input value={parameter.reference} onChange={(event) => setParameterDrafts((drafts) => drafts.map((draft, row) => row === index ? { ...draft, reference: event.target.value } : draft))} placeholder="Optional" /></label>
+                <button type="button" className="button button-small button-outline parameter-remove" aria-label={`Remove parameter ${index + 1}`} disabled={parameterDrafts.length === 1} onClick={() => setParameterDrafts((drafts) => drafts.filter((_, row) => row !== index))}>Remove</button>
+              </div>)}
+            </div>
+          </>}
           {masterDialog !== 'tests' && <label>Phone number<input value={masterDraft.phone} onChange={(event) => setMasterDraft({ ...masterDraft, phone: event.target.value })} placeholder="+91 00000 00000" /></label>}
           <div className="dialog-actions"><button type="button" className="button button-outline" onClick={() => setMasterDialog(null)}>Cancel</button><button type="submit" className="button button-primary">Add record</button></div>
         </form>
@@ -767,7 +846,7 @@ function App() {
         <div className="report-toolbar"><span className="status-pill status-complete"><i /> Review before release</span><button className="button button-outline button-small" onClick={() => window.print()}><Icon name="print" size={15} /> Print report</button></div>
         <div className="printable-report">
           <div className="report-brand"><span className="brand-mark"><Icon name="flask" size={19} /></span><div><strong>PRIME AI LAB</strong><small>LABORATORY TEST REPORT</small></div></div>
-          <div className="report-patient-info"><div><small>PATIENT NAME</small><strong>{selectedReportPatient.name}</strong></div><div><small>PATIENT ID</small><strong>{selectedReportPatient.id}</strong></div><div><small>AGE / GENDER</small><strong>{selectedReportPatient.age} yrs / {selectedReportPatient.gender}</strong></div><div><small>REPORT DATE</small><strong>{formatDate(new Date().toISOString())}</strong></div><div><small>ORDERING DOCTOR</small><strong>{getDoctor(store, selectedReportPatient.doctorId)}</strong></div><div><small>REFERRED BY</small><strong>{getReferrer(store, selectedReportPatient.referrerId)}</strong></div></div>
+          <div className="report-patient-info"><div><small>PATIENT NAME</small><strong>{selectedReportPatient.name}</strong></div><div><small>PATIENT ID</small><strong>{selectedReportPatient.id}</strong></div><div><small>AGE / GENDER</small><strong>{selectedReportPatient.age} yrs / {selectedReportPatient.gender}</strong></div><div><small>REPORT DATE</small><strong>{formatDate(new Date().toISOString())}</strong></div><div><small>LAB TECHNICIAN</small><strong>{getLabTechnician(store, selectedReportPatient.labTechnicianId)}</strong></div><div><small>SAMPLE COLLECTOR</small><strong>{getSampleCollector(store, selectedReportPatient.sampleCollectorId)}</strong></div><div><small>REFERRED BY</small><strong>{getReferrer(store, selectedReportPatient.referrerId)}</strong></div></div>
           <table className="report-results-table"><thead><tr><th>TEST</th><th>PARAMETER</th><th>RESULT</th><th>UNIT</th><th>REFERENCE RANGE</th><th>STATUS</th></tr></thead><tbody>{selectedPatientOrders.flatMap((order) => {
             const test = getTest(store, order.testId)
             return getTestParameters(store, order).map((parameter) => <tr key={`${order.id}:${parameter.id}`}><td>{test?.name ?? 'Test removed'}</td><td>{parameter.name}</td><td><strong>{getParameterResult(order, parameter) || 'Pending'}</strong></td><td>{parameter.unit || '—'}</td><td>{parameter.reference || '—'}</td><td>{order.status}</td></tr>)

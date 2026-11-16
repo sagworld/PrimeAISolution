@@ -13,7 +13,7 @@ Use Node.js 18.18 or newer. `npm run build` performs the TypeScript project chec
 
 ## Optional local AI explanations
 
-The report viewer can request a plain-language explanation in Marathi, English, or Hindi from a local Ollama model. No patient name, ID, age, or phone number is sent to the model; only test names, entered parameter values, units, and the supplied reference ranges are included. The AI API binds to `127.0.0.1`; Vite proxies `/api` requests to it.
+The report viewer can request a plain-language explanation in Marathi, English, or Hindi from a local Ollama model. No patient name, ID, age, or phone number is sent to the model; only test names, entered parameter values, units, and the supplied reference ranges are included. The explanation should compare values only with supplied ranges and must not infer a disease or organ problem from an abnormal result. The AI API binds to `127.0.0.1`; Vite proxies `/api` requests to it.
 
 1. Install Ollama for Windows from [ollama.com](https://ollama.com/).
 2. In a terminal, download the free local model: `ollama pull qwen2.5:3b`. The first run downloads several GB and requires enough disk space and memory.
@@ -24,7 +24,7 @@ The model can be changed with `OLLAMA_MODEL` (defaults to `qwen2.5:3b`). The loc
 
 ## Included workflows
 
-- Maintain doctor, referral partner and test-catalogue records.
+- Maintain lab technician, referral partner, sample collector and test-catalogue records; define multiple named parameters for each new test.
 - Register patients and add multiple tests to the lab queue in one operation.
 - Enter individual test parameters, track pending/completed orders, and prepare patient reports.
 - Generate a report for one test or print all tests for a selected patient. Sample CBC and Peripheral Blood Smear tests include parameter-level examples.
