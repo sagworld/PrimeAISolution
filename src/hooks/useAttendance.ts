@@ -4,19 +4,35 @@ import { HEAD_PASSWORD, HEAD_USERNAME } from '@/shared/data/initialStore'
 import type { LabAppState } from '@/hooks/useLabState'
 import type { AppCoreActions } from '@/hooks/useAppCore'
 
-export function useAttendance(state: LabAppState, { persist }: AppCoreActions) {
+export function useAttendance(state: LabAppState, { persist, notify }: AppCoreActions) {
   const {
-    store, attendanceDate, headUsername, headPassword, setHeadLoginError, setHeadAuthenticated,
-    setHeadUsername, setHeadPassword, setSection, t,
+    store, headUsername, headPassword, setHeadLoginError, setHeadAuthenticated,
+    setHeadUsername, setHeadPassword, setSection, setAdministrationTab, t,
   } = state
+  const saveTechnicianAttendance = (
+    date: string,
+    statuses: Record<string, AttendanceStatus | ''>,
+  ) => {
+    const technicianIds = new Set(store.labTechnicians.map((technician) => technician.id))
+    const remaining = store.attendance.filter((record) =>
+      record.date !== date || !technicianIds.has(record.labTechnicianId),
+    )
+    const updatedAt = new Date().toISOString()
+    const attendance = Object.entries(statuses).flatMap(([labTechnicianId, status]) =>
+      status ? [{ id: `${date}:${labTechnicianId}`, labTechnicianId, date, status, updatedAt }] : [],
+    )
+    persist({ ...store, attendance: [...attendance, ...remaining] })
+    notify('Attendance saved.')
+  }
 
   const loginHead = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (headUsername.trim() !== HEAD_USERNAME || headPassword !== HEAD_PASSWORD) {
-      setHeadLoginError(t('Incorrect Head username or password.'))
+      setHeadLoginError(t('Incorrect username or password.'))
       return
     }
     setHeadAuthenticated(true)
+    setAdministrationTab('attendance')
     setHeadUsername('')
     setHeadPassword('')
     setHeadLoginError('')
@@ -27,23 +43,14 @@ export function useAttendance(state: LabAppState, { persist }: AppCoreActions) {
     setHeadUsername('')
     setHeadPassword('')
     setHeadLoginError('')
-    setSection('overview')
+    setSection('administration')
+    setAdministrationTab('attendance')
   }
 
-  const openAttendance = () => {
+  const openAdministration = () => {
     setHeadLoginError('')
-    setSection('attendance')
+    setSection('administration')
   }
 
-  const setTechnicianAttendance = (labTechnicianId: string, status: AttendanceStatus | '') => {
-    const remaining = store.attendance.filter((record) =>
-      record.labTechnicianId !== labTechnicianId || record.date !== attendanceDate,
-    )
-    const attendance = status
-      ? [{ id: `${attendanceDate}:${labTechnicianId}`, labTechnicianId, date: attendanceDate, status, updatedAt: new Date().toISOString() }, ...remaining]
-      : remaining
-    persist({ ...store, attendance })
-  }
-
-  return { loginHead, logoutHead, openAttendance, setTechnicianAttendance }
+  return { loginHead, logoutHead, openAdministration, saveTechnicianAttendance }
 }

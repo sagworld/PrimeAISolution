@@ -2,10 +2,12 @@ import { useRef, useState } from 'react'
 import { type UiLanguage } from '@/i18n'
 import type {
   AppearanceSettings,
+  AdministrationTab,
   ExplanationLanguage,
   MasterTab,
   OrderStatusFilter,
   ReportPeriod,
+  RevenueCategory,
   Section,
   Store,
   TestProfile,
@@ -19,15 +21,20 @@ export function useLabState() {
   const [uiLanguage, setUiLanguage] = useState<UiLanguage>(readUiLanguage)
   const [appearance, setAppearance] = useState<AppearanceSettings>(readAppearance)
   const [section, setSection] = useState<Section>('overview')
+  const [administrationTab, setAdministrationTab] = useState<AdministrationTab>('attendance')
   const [headAuthenticated, setHeadAuthenticated] = useState(false)
   const [headUsername, setHeadUsername] = useState('')
   const [headPassword, setHeadPassword] = useState('')
   const [headLoginError, setHeadLoginError] = useState('')
-  const [attendanceDate, setAttendanceDate] = useState(() => dateInputValue())
+  const [attendanceStartDate, setAttendanceStartDate] = useState(() => dateInputValue())
+  const [attendanceEndDate, setAttendanceEndDate] = useState(() => dateInputValue())
+  const [attendanceMarkDate, setAttendanceMarkDate] = useState(() => dateInputValue())
+  const [attendanceInfoTechnicianId, setAttendanceInfoTechnicianId] = useState<string | null>(null)
   const [masterTab, setMasterTab] = useState<MasterTab>('lab-technicians')
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('Daily')
-  const [revenuePeriod, setRevenuePeriod] = useState<ReportPeriod>('Daily')
-  const [revenueDate, setRevenueDate] = useState(() => dateInputValue())
+  const [revenueCategory, setRevenueCategory] = useState<RevenueCategory>('doctor')
+  const [revenueFromDate, setRevenueFromDate] = useState(() => dateInputValue())
+  const [revenueToDate, setRevenueToDate] = useState(() => dateInputValue())
   const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatusFilter>('All')
   const [search, setSearch] = useState('')
   const [patientDialog, setPatientDialog] = useState(false)
@@ -54,9 +61,14 @@ export function useLabState() {
 
   return {
     store, setStore, uiLanguage, setUiLanguage, appearance, setAppearance, section, setSection,
+    administrationTab, setAdministrationTab,
     headAuthenticated, setHeadAuthenticated, headUsername, setHeadUsername, headPassword, setHeadPassword,
-    headLoginError, setHeadLoginError, attendanceDate, setAttendanceDate, masterTab, setMasterTab,
-    reportPeriod, setReportPeriod, revenuePeriod, setRevenuePeriod, revenueDate, setRevenueDate,
+    headLoginError, setHeadLoginError, attendanceStartDate, setAttendanceStartDate,
+    attendanceEndDate, setAttendanceEndDate, attendanceMarkDate, setAttendanceMarkDate,
+    attendanceInfoTechnicianId, setAttendanceInfoTechnicianId,
+    masterTab, setMasterTab,
+    reportPeriod, setReportPeriod, revenueCategory, setRevenueCategory,
+    revenueFromDate, setRevenueFromDate, revenueToDate, setRevenueToDate,
     orderStatusFilter, setOrderStatusFilter, search, setSearch, patientDialog, setPatientDialog,
     testDialog, setTestDialog, masterDialog, setMasterDialog, reportPatientId, setReportPatientId,
     reportOrderIds, setReportOrderIds, generationPatientId, setGenerationPatientId, aiLanguage, setAiLanguage,

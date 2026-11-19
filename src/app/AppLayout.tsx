@@ -17,7 +17,7 @@ import { accentThemes } from '@/shared/data/initialStore'
 import '../styles/App.css'
 
 export function AppLayout() {
-  const { store, uiLanguage, appearance, section, setSection, search, setSearch, toast, t, updateAppearance, changeUiLanguage, openAttendance, pendingCount } = useAppContext()
+  const { store, uiLanguage, appearance, section, setSection, administrationTab, setAdministrationTab, headAuthenticated, logoutHead, attendanceStartDate, setAttendanceStartDate, attendanceEndDate, setAttendanceEndDate, search, setSearch, toast, t, updateAppearance, changeUiLanguage, openAdministration, pendingCount } = useAppContext()
   return (
     <div className="app-shell" data-mode={appearance.mode} data-accent={appearance.accent}>
       <aside className="sidebar">
@@ -31,11 +31,10 @@ export function AppLayout() {
           <div className="nav-separator" />
           <button className={`nav-item ${section === 'masters' ? 'active' : ''}`} onClick={() => setSection('masters')}><Icon name="masters" /><span>{t('Masters')}</span></button>
           <button className={`nav-item ${section === 'patients' ? 'active' : ''}`} onClick={() => setSection('patients')}><Icon name="patients" /><span>{t('Patients')}</span><span className="nav-count">{store.patients.length}</span></button>
-          <button className={`nav-item ${section === 'attendance' ? 'active' : ''}`} onClick={openAttendance}><Icon name="clock" /><span>{t('Attendance')}</span></button>
+          <button className={`nav-item ${section === 'administration' ? 'active' : ''}`} onClick={openAdministration}><Icon name="masters" /><span>{t('Administration')}</span></button>
           <button className={`nav-item ${section === 'results' ? 'active' : ''}`} onClick={() => setSection('results')}><Icon name="flask" /><span>{t('Test results')}</span>{pendingCount > 0 && <span className="nav-count warning">{pendingCount}</span>}</button>
           <button className={`nav-item ${section === 'report-generation' ? 'active' : ''}`} onClick={() => setSection('report-generation')}><Icon name="print" /><span>{t('Report generation')}</span></button>
           <button className={`nav-item ${section === 'reports' ? 'active' : ''}`} onClick={() => setSection('reports')}><Icon name="report" /><span>{t('Reports')}</span></button>
-          <button className={`nav-item ${section === 'revenue' ? 'active' : ''}`} onClick={() => setSection('revenue')}><Icon name="trend" /><span>{t('Revenue')}</span></button>
           <button className={`nav-item ${section === 'store-expenditure' ? 'active' : ''}`} onClick={() => setSection('store-expenditure')}><Icon name="masters" /><span>{t('Store & Expenditure')}</span></button>
         </nav>
         <div className="sidebar-bottom">
@@ -55,7 +54,7 @@ export function AppLayout() {
 
       <main className={`main-panel ${section === 'store-expenditure' ? 'store-expenditure-main' : ''}`}>
         <header className="topbar">
-          <div className="breadcrumbs"><span>Prime AI Lab</span><span className="crumb-slash">/</span><strong>{t(section === 'overview' ? 'Overview' : section === 'results' ? 'Test results' : section === 'report-generation' ? 'Report generation' : section === 'masters' ? 'Masters' : section === 'patients' ? 'Patients' : section === 'attendance' ? 'Attendance' : section === 'revenue' ? 'Revenue' : section === 'store-expenditure' ? 'Store & Expenditure' : 'Reports')}</strong></div>
+          <div className="breadcrumbs"><span>Prime AI Lab</span><span className="crumb-slash">/</span><strong>{t(section === 'overview' ? 'Overview' : section === 'results' ? 'Test results' : section === 'report-generation' ? 'Report generation' : section === 'masters' ? 'Masters' : section === 'patients' ? 'Patients' : section === 'administration' ? 'Administration' : section === 'store-expenditure' ? 'Store & Expenditure' : 'Reports')}</strong></div>
           <div className="topbar-actions">
             <label className="global-search"><Icon name="search" size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('Search patients, tests...')} aria-label={t('Search patients and tests')} /><kbd>⌘ K</kbd></label>
             <label className="ui-language-picker"><span>{t('Language')}</span><select aria-label={t('Language')} value={uiLanguage} onChange={(event) => { const language = event.target.value; if (language === 'en' || language === 'mr' || language === 'hi') changeUiLanguage(language) }}><option value="en">English</option><option value="mr">मराठी</option><option value="hi">हिन्दी</option></select></label>
@@ -76,6 +75,33 @@ export function AppLayout() {
         </header>
 
         <div className="page-content">
+          {section === 'administration' && headAuthenticated && (
+            <section className="page-section">
+              <div className="administration-header">
+                <div className="tab-bar administration-tabs" role="tablist" aria-label={t('Administration modules')}>
+                  {(['attendance', 'revenue'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      role="tab"
+                      aria-selected={administrationTab === tab}
+                      className={administrationTab === tab ? 'selected' : ''}
+                      onClick={() => setAdministrationTab(tab)}
+                    >
+                      {t(tab === 'attendance' ? 'Attendance' : 'Revenue')}
+                    </button>
+                  ))}
+                </div>
+                {administrationTab === 'attendance' && (
+                  <div className="attendance-date-range administration-date-range">
+                    <label className="attendance-date-picker"><span>{t('From date')}</span><input type="date" max={attendanceEndDate} value={attendanceStartDate} onChange={(event) => { if (event.target.value) setAttendanceStartDate(event.target.value) }} /></label>
+                    <label className="attendance-date-picker"><span>{t('To date')}</span><input type="date" min={attendanceStartDate} value={attendanceEndDate} onChange={(event) => { if (event.target.value) setAttendanceEndDate(event.target.value) }} /></label>
+                  </div>
+                )}
+                <button type="button" className="button button-outline administration-logout" onClick={logoutHead}>{t('Log out')}</button>
+              </div>
+            </section>
+          )}
           <OverviewPage />
           <MastersPage />
           <AttendancePage />

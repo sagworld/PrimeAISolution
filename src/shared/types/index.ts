@@ -1,6 +1,8 @@
-export type Section = 'overview' | 'masters' | 'patients' | 'attendance' | 'results' | 'report-generation' | 'reports' | 'revenue' | 'store-expenditure'
+export type Section = 'overview' | 'masters' | 'patients' | 'administration' | 'results' | 'report-generation' | 'reports' | 'store-expenditure'
+export type AdministrationTab = 'attendance' | 'revenue'
 export type MasterTab = 'lab-technicians' | 'referrers' | 'sample-collectors' | 'tests'
 export type ReportPeriod = 'Daily' | 'Weekly' | 'Monthly'
+export type RevenueCategory = 'doctor' | 'technician' | 'collector'
 export type OrderStatus = 'Pending' | 'Completed'
 export type OrderStatusFilter = 'All' | OrderStatus
 export type ExplanationLanguage = 'Marathi' | 'English' | 'Hindi'

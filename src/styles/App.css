@@ -1132,6 +1132,35 @@ kbd {
   border-bottom: 1px solid #e7eded;
 }
 
+.administration-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.administration-header .administration-tabs {
+  min-width: 0;
+  flex: 1;
+}
+
+.administration-date-range {
+  margin-left: auto;
+  padding-bottom: 16px;
+}
+
+.administration-date-range .attendance-date-picker {
+  font-size: 8px;
+}
+
+.administration-date-range .attendance-date-picker input {
+  height: 32px;
+}
+
+.administration-logout {
+  flex: 0 0 auto;
+  margin-bottom: 16px;
+}
+
 .tab-bar button,
 .report-period-tabs button {
   display: inline-flex;
@@ -1348,6 +1377,15 @@ kbd {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.attendance-calendar-panel {
+  margin-bottom: 15px;
+  padding: 14px 18px;
+}
+
+.attendance-calendar-panel .attendance-date-range {
+  justify-content: flex-end;
+}
+
 .attendance-login-card {
   max-width: 430px;
   margin: 20px auto;
@@ -1380,8 +1418,73 @@ kbd {
   font-weight: 600;
 }
 
-.attendance-date-picker input,
-.attendance-status-select {
+.attendance-date-range {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.attendance-register-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.attendance-history-panel {
+  margin-top: 16px;
+  padding: 16px 18px 12px;
+}
+
+.attendance-history-panel .panel-heading {
+  margin-bottom: 10px;
+}
+
+.attendance-history-table-wrap {
+  max-height: 300px;
+  overflow-x: auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.attendance-history-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+}
+
+.attendance-history-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.attendance-history-table th,
+.attendance-history-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #edf0f1;
+  font-size: 10px;
+  vertical-align: top;
+}
+
+.attendance-history-table th {
+  color: #9aa5a5;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.45px;
+}
+
+.attendance-history-table td {
+  color: #667475;
+}
+
+.attendance-history-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.attendance-date-picker input {
   height: 34px;
   padding: 0 9px;
   border: 1px solid #e8edef;
@@ -1391,12 +1494,266 @@ kbd {
   font-size: 10px;
 }
 
-.attendance-status-select {
-  min-width: 130px;
+.attendance-status-options {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.attendance-save-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.attendance-status-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 2px;
+  border: 0;
+  background: transparent;
+  color: #718082;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.attendance-status-option i {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border: 1.5px solid #c6d0cf;
+  border-radius: 50%;
+}
+
+.attendance-status-option i::after {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: transparent;
+  content: '';
+}
+
+.attendance-status-option.selected.status-present {
+  color: #238363;
+}
+
+.attendance-status-option.selected.status-present i {
+  border-color: #238363;
+}
+
+.attendance-status-option.selected.status-present i::after {
+  background: #238363;
+}
+
+.attendance-status-option.selected.status-absent {
+  color: #bb5656;
+}
+
+.attendance-status-option.selected.status-absent i {
+  border-color: #bb5656;
+}
+
+.attendance-status-option.selected.status-absent i::after {
+  background: #bb5656;
+}
+
+.attendance-status-option.selected.status-leave {
+  color: #b17a23;
+}
+
+.attendance-status-option.selected.status-leave i {
+  border-color: #b17a23;
+}
+
+.attendance-status-option.selected.status-leave i::after {
+  background: #b17a23;
+}
+
+.attendance-info-button {
+  min-height: 34px;
+}
+
+.attendance-info-dialog {
+  width: min(100%, 430px);
+}
+
+.attendance-info-range {
+  margin: 0 0 14px;
+  color: #849091;
+  font-size: 11px;
+}
+
+.attendance-month-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.attendance-month-heading h3 {
+  margin: 0;
+  color: #465858;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.attendance-month-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.attendance-month-weekday {
+  padding: 4px 0;
+  color: #899596;
+  font-size: 9px;
+  font-weight: 650;
+  text-align: center;
+}
+
+.attendance-month-day {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border-radius: 7px;
+  background: #f5f7f7;
+  color: #627171;
+  font-size: 10px;
+}
+
+.attendance-month-day.empty {
+  background: transparent;
+}
+
+.attendance-month-day strong {
+  display: grid;
+  width: 17px;
+  height: 17px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 8px;
+}
+
+.attendance-month-day.status-present strong,
+.attendance-month-legend .status-present {
+  background: #238363;
+}
+
+.attendance-month-day.status-present {
+  background: #d9f0e7;
+  color: #17684f;
+}
+
+.attendance-month-day.status-absent strong,
+.attendance-month-legend .status-absent {
+  background: #bb5656;
+}
+
+.attendance-month-day.status-absent {
+  background: #f7e0e0;
+  color: #963f3f;
+}
+
+.attendance-month-day.status-leave strong,
+.attendance-month-legend .status-leave {
+  background: #b17a23;
+}
+
+.attendance-month-day.status-leave {
+  background: #f6ebcf;
+  color: #8c631b;
+}
+
+.attendance-month-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+
+.attendance-month-legend span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #718082;
+  font-size: 9px;
+}
+
+.attendance-month-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.attendance-info-counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.attendance-info-counts .result-card {
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.attendance-info-dialog .dialog-actions {
+  margin-top: 16px;
 }
 
 .attendance-list-panel {
   overflow: auto;
+}
+
+.attendance-register-table-wrap {
+  max-height: 200px;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.attendance-register-table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+}
+
+@media (max-width: 640px) {
+  .administration-header {
+    flex-wrap: wrap;
+  }
+
+  .administration-header .administration-tabs {
+    flex: 1 1 100%;
+  }
+
+  .administration-date-range {
+    order: 2;
+    flex: 1 1 auto;
+    margin-left: 0;
+    padding-bottom: 16px;
+  }
+
+  .administration-logout {
+    order: 3;
+    margin-left: auto;
+  }
+
+  .attendance-register-controls {
+    width: 100%;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .attendance-register-controls .attendance-date-picker {
+    flex: 1 1 150px;
+  }
 }
 
 .normal-weight {
@@ -1454,17 +1811,51 @@ kbd {
   padding: 10px 14px;
 }
 
-.revenue-toolbar {
+.revenue-category-toolbar {
   display: flex;
   align-items: flex-end;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 5px;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
-.revenue-toolbar .report-period-tabs {
-  flex: 1;
+.revenue-category-toolbar .revenue-category-tabs {
+  min-width: 0;
+  flex: 1 1 350px;
   margin-bottom: 0;
+}
+
+.revenue-name-search {
+  min-width: 150px;
+  flex: 0 1 190px;
+}
+
+.revenue-name-search input {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #e8edef;
+  border-radius: 7px;
+  background: #fff;
+  color: #465858;
+  font-size: 10px;
+}
+
+.revenue-filter-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.revenue-custom-range {
+  min-height: 34px;
+  white-space: nowrap;
+}
+
+.revenue-date-range {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
 }
 
 .revenue-date-control {
@@ -1495,7 +1886,7 @@ kbd {
 
 .revenue-stats {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-bottom: 17px;
+  margin: 24px 0 17px;
 }
 
 .revenue-stats .stat-card {
@@ -1570,6 +1961,18 @@ kbd {
 
 .revenue-breakdown-panel .revenue-table {
   min-width: 320px;
+}
+
+.revenue-breakdown-panel .revenue-table-wrap {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.revenue-breakdown-panel .revenue-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
 }
 
 .revenue-breakdown-panel .revenue-table td:first-child {
@@ -2627,18 +3030,42 @@ kbd {
     gap: 9px;
   }
 
-  .revenue-toolbar {
+  .revenue-category-toolbar {
     align-items: stretch;
-    flex-direction: column-reverse;
+    flex-direction: column;
     gap: 10px;
   }
 
-  .revenue-toolbar .report-period-tabs {
+  .revenue-category-toolbar .revenue-category-tabs {
     overflow-x: auto;
+  }
+
+  .revenue-name-search {
+    width: 100%;
+    flex: 0 0 auto;
   }
 
   .revenue-date-control {
     width: 100%;
+  }
+
+  .revenue-filter-controls {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .revenue-filter-controls > .revenue-date-control,
+  .revenue-filter-controls > .revenue-date-range {
+    flex: 1 1 100%;
+  }
+
+  .revenue-date-range {
+    width: 100%;
+  }
+
+  .revenue-date-range .revenue-date-control {
+    min-width: 0;
+    flex: 1;
   }
 
   .revenue-date-control input {
@@ -2948,7 +3375,6 @@ kbd {
     .patient-picker select,
     .status-filter select,
     .attendance-date-picker input,
-    .attendance-status-select,
     .dialog-form input,
     .dialog-form select,
     .result-input,
