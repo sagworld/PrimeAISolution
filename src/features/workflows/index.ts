@@ -1,0 +1,5 @@
+export { MasterRecordDialog } from '@/features/workflows/MasterRecordDialog'
+export { PatientRegistrationDialog } from '@/features/workflows/PatientRegistrationDialog'
+export { PatientReportDialog } from '@/features/workflows/PatientReportDialog'
+export { TestOrderDialog } from '@/features/workflows/TestOrderDialog'
+export { WorkflowDialogs } from '@/features/workflows/WorkflowDialogs'
