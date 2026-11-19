@@ -16,6 +16,30 @@ function BillRow({ bill, locale, onRecordPayment, onViewBill }: { bill: ImportBi
   return <tr><td>{date}</td><td>{bill.itemName}</td><td>{bill.supplierName}</td><td>{bill.quantity.toLocaleString(locale, { maximumFractionDigits: 2 })} {unitLabel(bill.unit)}</td><td>{formatStoreCurrency(bill.costPerUnit, locale)}</td><td><strong>{formatStoreCurrency(bill.totalCost, locale)}</strong></td><td>{formatStoreCurrency(getBillPaidAmount(bill), locale)}</td><td>{formatStoreCurrency(getBillRemaining(bill), locale)}</td><td><PaymentStatus status={status} /></td><td><div className="store-row-actions"><button type="button" className="button button-small button-outline" onClick={() => onViewBill(bill)}>View bill</button>{status !== 'paid' && <button type="button" className="button button-small button-outline" onClick={() => onRecordPayment(bill)}>Record payment</button>}</div></td></tr>
 }
 
+function BillCard({ bill, locale, onRecordPayment, onViewBill }: { bill: ImportBill; locale: string; onRecordPayment: (bill: ImportBill) => void; onViewBill: (bill: ImportBill) => void }) {
+  const date = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${bill.date}T00:00:00`))
+  const status = getBillPaymentStatus(bill)
+  return (
+    <article className="store-mobile-bill-card">
+      <div className="store-mobile-bill-heading">
+        <div><h3>{bill.itemName}</h3><span>{bill.supplierName} · {date}</span></div>
+        <PaymentStatus status={status} />
+      </div>
+      <div className="store-mobile-bill-quantity"><span>Quantity</span><strong>{bill.quantity.toLocaleString(locale, { maximumFractionDigits: 2 })} {unitLabel(bill.unit)}</strong></div>
+      <div className="store-mobile-bill-quantity"><span>Cost per unit</span><strong>{formatStoreCurrency(bill.costPerUnit, locale)}</strong></div>
+      <div className="store-mobile-bill-stats">
+        <div><span>Total</span><strong>{formatStoreCurrency(bill.totalCost, locale)}</strong></div>
+        <div><span>Paid</span><strong>{formatStoreCurrency(getBillPaidAmount(bill), locale)}</strong></div>
+        <div><span>Due</span><strong>{formatStoreCurrency(getBillRemaining(bill), locale)}</strong></div>
+      </div>
+      <div className="store-mobile-bill-actions">
+        <button type="button" className="button button-outline" onClick={() => onViewBill(bill)}>View bill</button>
+        {status !== 'paid' && <button type="button" className="button button-primary" onClick={() => onRecordPayment(bill)}>Record payment</button>}
+      </div>
+    </article>
+  )
+}
+
 function GroupRows({ group, locale, expanded, onToggle, onRecordPayment, onViewBill }: { group: BillGroup; locale: string; expanded: boolean; onToggle: () => void; onRecordPayment: (bill: ImportBill) => void; onViewBill: (bill: ImportBill) => void }) {
   return <>
     <tr className="store-group-row"><td colSpan={10}><button type="button" className="store-group-toggle" aria-expanded={expanded} onClick={onToggle}><span aria-hidden="true">{expanded ? '−' : '+'}</span>{group.label}<small>{group.bills.length} bills</small></button></td></tr>
@@ -84,6 +108,28 @@ export function BillsTable({
           </tbody>
           <TableTotalRow cells={['Total', '—', '—', totalQuantity === null ? '—' : `${totalQuantity.toLocaleString(locale, { maximumFractionDigits: 2 })} ${totalUnit ? unitLabel(totalUnit) : ''}`, '—', formatStoreCurrency(totalCost, locale), formatStoreCurrency(totalPaid, locale), formatStoreCurrency(remaining, locale), '—', '—']} />
         </table>
+      </div>
+      <div className="store-mobile-bill-list" role="region" aria-label="Import bills">
+        {groupBy === 'none' && bills.map((bill) => <BillCard key={bill.id} bill={bill} locale={locale} onRecordPayment={onRecordPayment} onViewBill={onViewBill} />)}
+        {groupBy !== 'none' && groupedBills.map((group) => (
+          <section className="store-mobile-bill-group" key={group.key}>
+            <button type="button" className="store-mobile-group-toggle" aria-expanded={!collapsed[group.key]} onClick={() => setCollapsed((state) => ({ ...state, [group.key]: !state[group.key] }))}>
+              <span>{group.label}</span><small>{group.bills.length} bills</small><span aria-hidden="true">{collapsed[group.key] ? '+' : '−'}</span>
+            </button>
+            {!collapsed[group.key] && group.bills.map((bill) => <BillCard key={bill.id} bill={bill} locale={locale} onRecordPayment={onRecordPayment} onViewBill={onViewBill} />)}
+            <div className="store-mobile-group-total">
+              <span>Group total</span><strong>{formatStoreCurrency(group.totalCost, locale)}</strong>
+              <small>Paid {formatStoreCurrency(group.totalPaid, locale)} · Due {formatStoreCurrency(group.remaining, locale)}</small>
+            </div>
+          </section>
+        ))}
+        {!bills.length && <p className="store-mobile-empty">No import bills match these filters.</p>}
+        <div className="store-mobile-list-total">
+          <span>Filtered totals</span>
+          <strong>{formatStoreCurrency(totalCost, locale)}</strong>
+          <small>Paid {formatStoreCurrency(totalPaid, locale)} · Due {formatStoreCurrency(remaining, locale)}</small>
+          {totalQuantity !== null && <small>Quantity {totalQuantity.toLocaleString(locale, { maximumFractionDigits: 2 })} {totalUnit ? unitLabel(totalUnit) : ''}</small>}
+        </div>
       </div>
     </div>
   )
