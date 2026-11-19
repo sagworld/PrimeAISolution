@@ -22,6 +22,14 @@ export function formatDate(value: string, language: UiLanguage = 'en') {
   return new Intl.DateTimeFormat(dateLocale(language), { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value))
 }
 
+export function normalizeIndianMobileNumber(value: string) {
+  let digits = value.replace(/\D/g, '')
+  if (digits.startsWith('0091') && digits.length === 14) digits = digits.slice(4)
+  else if (digits.startsWith('91') && digits.length === 12) digits = digits.slice(2)
+  else if (digits.startsWith('0') && digits.length === 11) digits = digits.slice(1)
+  return /^[6-9]\d{9}$/.test(digits) ? `+91${digits}` : null
+}
+
 export function getPatientName(store: Store, id: string) {
   return store.patients.find((patient) => patient.id === id)?.name ?? 'Unknown patient'
 }
