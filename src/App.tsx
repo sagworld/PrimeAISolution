@@ -1,13 +1,19 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { dateLocale, translate, type UiLanguage } from './i18n'
 import './App.css'
 
-type Section = 'overview' | 'masters' | 'patients' | 'results' | 'report-generation' | 'reports'
+type Section = 'overview' | 'masters' | 'patients' | 'attendance' | 'results' | 'report-generation' | 'reports' | 'revenue'
 type MasterTab = 'lab-technicians' | 'referrers' | 'sample-collectors' | 'tests'
 type ReportPeriod = 'Daily' | 'Weekly' | 'Monthly'
 type OrderStatus = 'Pending' | 'Completed'
 type OrderStatusFilter = 'All' | OrderStatus
 type ExplanationLanguage = 'Marathi' | 'English' | 'Hindi'
+type TestProfile = 'preoperative' | 'anc' | 'other'
+type AttendanceStatus = 'Present' | 'Absent' | 'Leave'
+type AppearanceMode = 'light' | 'dark'
+type AccentTheme = 'mint' | 'blue' | 'violet' | 'rose'
+type AppearanceSettings = { mode: AppearanceMode; accent: AccentTheme }
+type RevenueSummaryRow = { id: string; name: string; orders: number; amount: number }
 
 type LabTechnician = { id: string; name: string; specialty: string; phone: string }
 type Referrer = { id: string; name: string; organization: string; phone: string }
@@ -23,6 +29,7 @@ type Patient = {
   referrerId: string
   createdAt: string
 }
+type AttendanceRecord = { id: string; labTechnicianId: string; date: string; status: AttendanceStatus; updatedAt: string }
 type PersistedPatient = Omit<Patient, 'labTechnicianId' | 'sampleCollectorId'> &
   Partial<Pick<Patient, 'labTechnicianId' | 'sampleCollectorId'>> & { doctorId?: string }
 type TestParameter = { id: string; name: string; unit: string; reference?: string }
@@ -34,6 +41,7 @@ type LabTest = {
   unit: string
   reference: string
   parameters?: TestParameter[]
+  profiles?: TestProfile[]
 }
 type LabOrder = {
   id: string
@@ -43,6 +51,7 @@ type LabOrder = {
   result: string
   parameterResults?: Record<string, string>
   status: OrderStatus
+  printedAt?: string
 }
 type Store = {
   labTechnicians: LabTechnician[]
@@ -51,10 +60,20 @@ type Store = {
   patients: Patient[]
   tests: LabTest[]
   orders: LabOrder[]
+  attendance: AttendanceRecord[]
 }
 
 const STORAGE_KEY = 'primeaisolution-lab-v1'
 const UI_LANGUAGE_STORAGE_KEY = 'primeaisolution-ui-language'
+const APPEARANCE_STORAGE_KEY = 'primeaisolution-appearance'
+const HEAD_USERNAME = 'head'
+const HEAD_PASSWORD = 'lab123'
+const accentThemes: { id: AccentTheme; label: string; color: string }[] = [
+  { id: 'mint', label: 'Mint', color: '#168466' },
+  { id: 'blue', label: 'Ocean blue', color: '#3478c4' },
+  { id: 'violet', label: 'Violet', color: '#7961bd' },
+  { id: 'rose', label: 'Rose', color: '#c75f76' },
+]
 const cbcParameters: TestParameter[] = [
   { id: 'hemoglobin', name: 'Hemoglobin (Hb)', unit: 'g/dL', reference: '12.0–17.5' },
   { id: 'rbc-count', name: 'RBC Count', unit: 'million/µL', reference: '4.0–5.5' },
@@ -70,10 +89,140 @@ const smearParameters: TestParameter[] = [
   { id: 'blood-cell-abnormalities', name: 'Blood Cell Abnormalities', unit: '' },
 ]
 
+const testProfiles: { id: TestProfile; label: string }[] = [
+  { id: 'preoperative', label: 'Preoperative Profile' },
+  { id: 'anc', label: 'ANC Profile (Antenatal Care)' },
+  { id: 'other', label: 'Other tests' },
+]
+
+function profileTest(
+  id: string,
+  name: string,
+  category: string,
+  profiles: TestProfile[],
+  parameters: { name: string; unit?: string }[],
+): LabTest {
+  return {
+    id,
+    name,
+    category,
+    price: 0,
+    unit: '',
+    reference: '',
+    profiles,
+    parameters: parameters.map((parameter, index) => ({
+      id: `${id}-parameter-${index + 1}`,
+      name: parameter.name,
+      unit: parameter.unit ?? '',
+      reference: '',
+    })),
+  }
+}
+
+function belongsToProfile(test: LabTest, profile: TestProfile) {
+  return profile === 'other' ? !test.profiles?.length : Boolean(test.profiles?.includes(profile))
+}
+
+const profileTests: LabTest[] = [
+  profileTest('profile-preop-cbc', 'CBC (Complete Blood Count)', 'Hematology', ['preoperative'], [
+    { name: 'Hemoglobin (Hb)' },
+    { name: 'RBC Count' },
+    { name: 'Total WBC Count (TC)' },
+    { name: 'Neutrophils' },
+    { name: 'Lymphocytes' },
+    { name: 'Monocytes' },
+    { name: 'Eosinophils' },
+    { name: 'Basophils' },
+    { name: 'Platelet Count' },
+    { name: 'PCV' },
+    { name: 'MCV' },
+    { name: 'MCH' },
+    { name: 'MCHC' },
+    { name: 'ESR' },
+  ]),
+  profileTest('profile-anc-cbc', 'CBC (Complete Blood Count)', 'Hematology', ['anc'], [
+    { name: 'Hemoglobin (Hb)' },
+    { name: 'RBC Count' },
+    { name: 'Total WBC Count (TC)' },
+    { name: 'Neutrophils' },
+    { name: 'Lymphocytes' },
+    { name: 'Monocytes' },
+    { name: 'Eosinophils' },
+    { name: 'Basophils' },
+    { name: 'Platelet Count' },
+    { name: 'PCV' },
+    { name: 'MCV' },
+    { name: 'MCH' },
+    { name: 'MCHC' },
+  ]),
+  profileTest('profile-blood-group-rh', 'Blood Group & Rh Type', 'Hematology', ['preoperative', 'anc'], [
+    { name: 'ABO Group (A, B, AB, O)' },
+    { name: 'Rh Factor (Positive / Negative)' },
+  ]),
+  profileTest('profile-preop-bt', 'Bleeding Time (BT)', 'Hematology', ['preoperative'], [
+    { name: 'Bleeding Time', unit: 'minutes/seconds' },
+  ]),
+  profileTest('profile-preop-ct', 'Clotting Time (CT)', 'Hematology', ['preoperative'], [
+    { name: 'Clotting Time', unit: 'minutes/seconds' },
+  ]),
+  profileTest('profile-preop-pt', 'Prothrombin Time (PT)', 'Hematology', ['preoperative'], [
+    { name: 'PT', unit: 'seconds' },
+    { name: 'Control Time', unit: 'seconds' },
+    { name: 'INR' },
+  ]),
+  profileTest('profile-preop-blood-sugar', 'Blood Sugar (Fasting / Random)', 'Biochemistry', ['preoperative'], [
+    { name: 'Blood Glucose level' },
+  ]),
+  profileTest('profile-anc-blood-sugar', 'Blood Sugar (Fasting / Post-Prandial / Random)', 'Biochemistry', ['anc'], [
+    { name: 'Blood Glucose level' },
+  ]),
+  profileTest('profile-preop-blood-urea', 'Blood Urea', 'Biochemistry', ['preoperative'], [
+    { name: 'Blood Urea level' },
+    { name: 'BUN' },
+  ]),
+  profileTest('profile-preop-creatinine', 'S. Creatinine', 'Biochemistry', ['preoperative'], [
+    { name: 'Serum Creatinine level' },
+  ]),
+  profileTest('profile-anc-tsh', 'TSH (Thyroid Stimulating Hormone)', 'Immunology', ['anc'], [
+    { name: 'Serum TSH level' },
+  ]),
+  profileTest('profile-hiv', 'H.I.V. Test', 'Immunology', ['preoperative', 'anc'], [
+    { name: 'HIV-1 & HIV-2 Antibodies' },
+    { name: 'p24 Antigen' },
+  ]),
+  profileTest('profile-hbsag', 'Australia Antigen (HBsAg)', 'Immunology', ['preoperative', 'anc'], [
+    { name: 'Hepatitis B Surface Antigen' },
+  ]),
+  profileTest('profile-hcv', 'H.C.V.', 'Immunology', ['preoperative', 'anc'], [
+    { name: 'Anti-HCV Antibodies' },
+  ]),
+  profileTest('profile-anc-vdrl', 'V.D.R.L.', 'Immunology', ['anc'], [
+    { name: 'Reagin Antibodies (Reactive / Non-reactive)' },
+  ]),
+  profileTest('profile-anc-urine-routine', 'Urine Routine', 'Clinical Pathology', ['anc'], [
+    { name: 'Color' },
+    { name: 'Appearance' },
+    { name: 'Specific Gravity' },
+    { name: 'pH' },
+    { name: 'Protein/Albumin' },
+    { name: 'Glucose' },
+    { name: 'Ketones' },
+    { name: 'Pus cells' },
+    { name: 'RBCs' },
+    { name: 'Epithelial cells' },
+    { name: 'Casts' },
+    { name: 'Crystals' },
+  ]),
+]
+
 function daysAgo(days: number) {
   const date = new Date()
   date.setDate(date.getDate() - days)
   return date.toISOString()
+}
+
+function dateInputValue(date = new Date()) {
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
 }
 
 const initialStore: Store = {
@@ -104,6 +253,7 @@ const initialStore: Store = {
     { id: 'test-4', name: 'Thyroid Profile (TSH)', category: 'Immunology', price: 600, unit: 'µIU/mL', reference: '0.4–4.0' },
     { id: 'test-5', name: 'Liver Function Test', category: 'Biochemistry', price: 950, unit: 'U/L', reference: '7–56' },
     { id: 'test-6', name: 'Peripheral Blood Smear', category: 'Hematology', price: 500, unit: '', reference: '', parameters: smearParameters },
+    ...profileTests,
   ],
   orders: [
     { id: 'ORD-101', patientId: 'PT-2401', testId: 'test-1', createdAt: daysAgo(0), result: '14.2', parameterResults: { hemoglobin: '14.2', 'rbc-count': '4.8', 'wbc-count': '7,200', 'platelet-count': '265,000', hematocrit: '42', mcv: '88' }, status: 'Completed' },
@@ -114,6 +264,7 @@ const initialStore: Store = {
     { id: 'ORD-106', patientId: 'PT-2405', testId: 'test-2', createdAt: daysAgo(3), result: '96', status: 'Completed' },
     { id: 'ORD-107', patientId: 'PT-2401', testId: 'test-6', createdAt: daysAgo(0), result: '', parameterResults: { 'rbc-morphology': 'Normocytic, normochromic', 'wbc-morphology': 'Within expected limits', 'platelet-morphology': 'Adequate on smear', 'blood-cell-abnormalities': 'None observed' }, status: 'Completed' },
   ],
+  attendance: [],
 }
 
 function readStore(): Store {
@@ -169,7 +320,8 @@ function readStore(): Store {
           status: order.status === 'Completed' && !hasAllParameters ? 'Pending' as const : order.status,
         }
       })
-      return { labTechnicians, referrers: savedStore.referrers, sampleCollectors, patients, tests, orders }
+      const attendance = Array.isArray(savedStore.attendance) ? savedStore.attendance : []
+      return { labTechnicians, referrers: savedStore.referrers, sampleCollectors, patients, tests, orders, attendance }
     }
   } catch (error) {
     console.error('Unable to load saved lab data.', error)
@@ -196,6 +348,7 @@ function Icon({ name, size = 18 }: { name: string; size?: number }) {
     trend: <><path d="m3 17 6-6 4 4 8-8" /><path d="M15 7h6v6" /></>,
     menu: <><path d="M4 6h16M4 12h16M4 18h16" /></>,
     spark: <><path d="m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3Z" /><path d="m19 14 .9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9L19 14Z" /></>,
+    palette: <><path d="M12 3a9 9 0 1 0 0 18h1.2a1.8 1.8 0 0 0 1.3-3.1 1.8 1.8 0 0 1 1.3-3.1H18a3 3 0 0 0 3-3c0-4.9-4-8.8-9-8.8Z" /><circle cx="7.5" cy="11" r="1" /><circle cx="10" cy="7.5" r="1" /><circle cx="15" cy="8" r="1" /></>,
   }
 
   return (
@@ -227,12 +380,43 @@ function readUiLanguage(): UiLanguage {
   return 'en'
 }
 
+function readAppearance(): AppearanceSettings {
+  try {
+    const saved = localStorage.getItem(APPEARANCE_STORAGE_KEY)
+    if (saved) {
+      const parsed: unknown = JSON.parse(saved)
+      if (typeof parsed === 'object' && parsed !== null && 'mode' in parsed && 'accent' in parsed) {
+        const settings = parsed as { mode: unknown; accent: unknown }
+        return {
+          mode: settings.mode === 'dark' ? 'dark' : 'light',
+          accent: settings.accent === 'blue' || settings.accent === 'violet' || settings.accent === 'rose' ? settings.accent : 'mint',
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Unable to load appearance preferences.', error)
+  }
+  return { mode: 'light', accent: 'mint' }
+}
+
 function explanationLanguage(language: UiLanguage): ExplanationLanguage {
   return language === 'mr' ? 'Marathi' : language === 'hi' ? 'Hindi' : 'English'
 }
 
 function formatDate(value: string, language: UiLanguage = 'en') {
   return new Intl.DateTimeFormat(dateLocale(language), { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value))
+}
+
+async function readApiJson<T>(response: Response): Promise<T> {
+  const body = await response.text()
+  if (!body.trim()) {
+    throw new Error('The AI service returned an empty response. Restart it with npm run ai:server and try again.')
+  }
+  try {
+    return JSON.parse(body) as T
+  } catch {
+    throw new Error('The AI service returned an invalid response. Restart it with npm run ai:server and try again.')
+  }
 }
 
 function getPatientName(store: Store, id: string) {
@@ -266,6 +450,32 @@ function getReferrer(store: Store, id: string) {
   return store.referrers.find((referrer) => referrer.id === id)?.name ?? '—'
 }
 
+function summarizeRevenueByPerson(
+  orders: LabOrder[],
+  store: Store,
+  people: { id: string; name: string }[],
+  getPersonId: (patient: Patient) => string,
+  unassignedLabel: string,
+): RevenueSummaryRow[] {
+  const summaries = new Map<string, RevenueSummaryRow>(
+    people.map((person) => [person.id, { id: person.id, name: person.name, orders: 0, amount: 0 }]),
+  )
+
+  for (const order of orders) {
+    const patient = store.patients.find((item) => item.id === order.patientId)
+    const personId = patient ? getPersonId(patient) : ''
+    const person = people.find((item) => item.id === personId)
+    const key = person?.id ?? 'unassigned'
+    const summary = summaries.get(key) ?? { id: key, name: unassignedLabel, orders: 0, amount: 0 }
+    const price = getTest(store, order.testId)?.price ?? 0
+    summary.orders += 1
+    summary.amount += Number.isFinite(price) && price > 0 ? price : 0
+    summaries.set(key, summary)
+  }
+
+  return [...summaries.values()].sort((first, second) => second.amount - first.amount || first.name.localeCompare(second.name))
+}
+
 function Dialog({ title, onClose, children, className = '', language }: { title: string; onClose: () => void; children: ReactNode; className?: string; language: UiLanguage }) {
   return (
     <div className="dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
@@ -280,12 +490,44 @@ function Dialog({ title, onClose, children, className = '', language }: { title:
   )
 }
 
+function formatRevenue(amount: number, language: UiLanguage) {
+  return new Intl.NumberFormat(dateLocale(language), {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(amount)
+}
+
+function RevenueBreakdownPanel({ title, rows, language }: { title: string; rows: RevenueSummaryRow[]; language: UiLanguage }) {
+  const t = (text: string) => translate(language, text)
+  return (
+    <article className="panel revenue-breakdown-panel">
+      <div className="panel-heading"><div><h2>{title}</h2><p>{t('Revenue by assigned staff')}</p></div></div>
+      <div className="revenue-table-wrap">
+        <table className="revenue-table">
+          <thead><tr><th>{t('Name')}</th><th>{t('Orders')}</th><th>{t('Business')}</th></tr></thead>
+          <tbody>{rows.map((row) => <tr key={row.id}><td>{row.name}</td><td>{row.orders.toLocaleString(dateLocale(language))}</td><td><strong>{formatRevenue(row.amount, language)}</strong></td></tr>)}</tbody>
+        </table>
+        {!rows.length && <p className="empty-message">{t('No staff found.')}</p>}
+      </div>
+    </article>
+  )
+}
+
 function App() {
   const [store, setStore] = useState<Store>(readStore)
   const [uiLanguage, setUiLanguage] = useState<UiLanguage>(readUiLanguage)
+  const [appearance, setAppearance] = useState<AppearanceSettings>(readAppearance)
   const [section, setSection] = useState<Section>('overview')
+  const [headAuthenticated, setHeadAuthenticated] = useState(false)
+  const [headUsername, setHeadUsername] = useState('')
+  const [headPassword, setHeadPassword] = useState('')
+  const [headLoginError, setHeadLoginError] = useState('')
+  const [attendanceDate, setAttendanceDate] = useState(() => dateInputValue())
   const [masterTab, setMasterTab] = useState<MasterTab>('lab-technicians')
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('Daily')
+  const [revenuePeriod, setRevenuePeriod] = useState<ReportPeriod>('Daily')
+  const [revenueDate, setRevenueDate] = useState(() => dateInputValue())
   const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatusFilter>('All')
   const [search, setSearch] = useState('')
   const [patientDialog, setPatientDialog] = useState(false)
@@ -298,7 +540,10 @@ function App() {
   const [aiInterpretation, setAiInterpretation] = useState<{ text: string; model: string } | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
+  const [sharingReport, setSharingReport] = useState(false)
+  const reportRef = useRef<HTMLDivElement>(null)
   const [selectedPatientId, setSelectedPatientId] = useState('')
+  const [selectedTestProfile, setSelectedTestProfile] = useState<TestProfile | ''>('')
   const [selectedTestIds, setSelectedTestIds] = useState<string[]>([])
   const [patientDraft, setPatientDraft] = useState({ name: '', age: '', gender: 'Female', phone: '', labTechnicianId: '', sampleCollectorId: '', referrerId: '' })
   const [masterDraft, setMasterDraft] = useState({ name: '', specialty: '', organization: '', phone: '', category: '', price: '' })
@@ -306,6 +551,16 @@ function App() {
   const [resultDrafts, setResultDrafts] = useState<Record<string, string>>({})
   const [toast, setToast] = useState('')
   const t = (text: string) => translate(uiLanguage, text)
+
+  const updateAppearance = (next: AppearanceSettings) => {
+    setAppearance(next)
+    try {
+      localStorage.setItem(APPEARANCE_STORAGE_KEY, JSON.stringify(next))
+    } catch (error) {
+      console.error('Unable to save appearance preferences.', error)
+      setToast(t('Could not save appearance settings.'))
+    }
+  }
 
   const changeUiLanguage = (language: UiLanguage) => {
     setUiLanguage(language)
@@ -345,8 +600,43 @@ function App() {
     window.setTimeout(() => setToast(''), 2600)
   }
 
+  const loginHead = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (headUsername.trim() !== HEAD_USERNAME || headPassword !== HEAD_PASSWORD) {
+      setHeadLoginError(t('Incorrect Head username or password.'))
+      return
+    }
+    setHeadAuthenticated(true)
+    setHeadUsername('')
+    setHeadPassword('')
+    setHeadLoginError('')
+  }
+
+  const logoutHead = () => {
+    setHeadAuthenticated(false)
+    setHeadUsername('')
+    setHeadPassword('')
+    setHeadLoginError('')
+    setSection('overview')
+  }
+
+  const openAttendance = () => {
+    setHeadLoginError('')
+    setSection('attendance')
+  }
+
+  const setTechnicianAttendance = (labTechnicianId: string, status: AttendanceStatus | '') => {
+    const remaining = store.attendance.filter((record) =>
+      record.labTechnicianId !== labTechnicianId || record.date !== attendanceDate,
+    )
+    const attendance = status
+      ? [{ id: `${attendanceDate}:${labTechnicianId}`, labTechnicianId, date: attendanceDate, status, updatedAt: new Date().toISOString() }, ...remaining]
+      : remaining
+    persist({ ...store, attendance })
+  }
+
   const updateOrder = (id: string, changes: Partial<LabOrder>) => {
-    persist({ ...store, orders: store.orders.map((order) => order.id === id ? { ...order, ...changes } : order) })
+    persist({ ...store, orders: store.orders.map((order) => order.id === id ? { ...order, ...changes, printedAt: undefined } : order) })
   }
 
   const saveOrderResults = (order: LabOrder) => {
@@ -403,6 +693,107 @@ function App() {
     setAiError('')
   }
 
+  const printPatientReport = () => {
+    const printedOrderIds = new Set(selectedPatientOrders.map((order) => order.id))
+    window.print()
+    if (!window.confirm(t('Was this report printed successfully?'))) return
+    const printedAt = new Date().toISOString()
+    persist({
+      ...store,
+      orders: store.orders.map((order) => printedOrderIds.has(order.id) ? { ...order, printedAt } : order),
+    })
+  }
+
+  const sharePatientReportOnWhatsApp = async () => {
+    if (!selectedReportPatient) return
+    const phoneDigits = selectedReportPatient.phone.replace(/\D/g, '')
+    if (phoneDigits.length < 10 || phoneDigits.length > 15) {
+      notify('Enter a valid patient phone number before sharing this report.')
+      return
+    }
+    const phone = phoneDigits.length === 10 ? `91${phoneDigits}` : phoneDigits
+    if (!window.confirm(t('This creates a PDF containing confidential health information. Review the recipient before sharing it on WhatsApp.'))) return
+    if (!reportRef.current) {
+      notify('Could not create the PDF report. Try Print report and save as PDF.')
+      return
+    }
+
+    const fileShareSupported = typeof navigator.share === 'function'
+      && typeof navigator.canShare === 'function'
+      && navigator.canShare({ files: [new File([], 'report.pdf', { type: 'application/pdf' })] })
+    const whatsAppWindow = fileShareSupported ? null : window.open('', '_blank')
+    let pdfContainer: HTMLDivElement | null = null
+    setSharingReport(true)
+
+    try {
+      const { default: html2pdf } = await import('html2pdf.js')
+      const reportClone = reportRef.current.cloneNode(true) as HTMLDivElement
+      reportClone.querySelector('.ai-controls')?.remove()
+      const resultsScroll = reportClone.querySelector<HTMLElement>('.report-results-scroll')
+      if (resultsScroll) resultsScroll.style.overflow = 'visible'
+
+      pdfContainer = document.createElement('div')
+      pdfContainer.className = 'app-shell'
+      pdfContainer.dataset.mode = 'light'
+      pdfContainer.dataset.accent = document.querySelector<HTMLElement>('.app-shell')?.dataset.accent ?? 'mint'
+      pdfContainer.style.position = 'fixed'
+      pdfContainer.style.left = '-10000px'
+      pdfContainer.style.top = '0'
+      pdfContainer.style.width = '760px'
+      pdfContainer.style.background = '#fff'
+      pdfContainer.append(reportClone)
+      document.body.append(pdfContainer)
+
+      const filename = `Patient_Lab_Report_${new Date().toISOString().slice(0, 10)}.pdf`
+      const pdfBlob = await html2pdf()
+        .set({
+          margin: 8,
+          filename,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollY: 0 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        })
+        .from(pdfContainer)
+        .outputPdf('blob') as Blob
+      const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' })
+
+      if (fileShareSupported) {
+        try {
+          await navigator.share({ files: [pdfFile], title: t('Patient report') })
+          notify('PDF share completed. Confirm it was sent in WhatsApp.')
+          return
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') return
+          console.error('Unable to share the patient report PDF.', error)
+        }
+      }
+
+      const downloadUrl = URL.createObjectURL(pdfBlob)
+      const downloadLink = document.createElement('a')
+      downloadLink.href = downloadUrl
+      downloadLink.download = filename
+      document.body.append(downloadLink)
+      downloadLink.click()
+      downloadLink.remove()
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000)
+
+      const shareUrl = `https://wa.me/${phone}?text=${encodeURIComponent(t('Please find the attached patient lab report PDF.'))}`
+      if (whatsAppWindow) {
+        whatsAppWindow.location.href = shareUrl
+        notify('The PDF was downloaded. Attach it in WhatsApp before sending.')
+      } else {
+        notify('The PDF was downloaded. Open WhatsApp, attach it, and send it to the patient.')
+      }
+    } catch (error) {
+      console.error('Unable to create the patient report PDF.', error)
+      whatsAppWindow?.close()
+      notify('Could not create the PDF report. Try Print report and save as PDF.')
+    } finally {
+      pdfContainer?.remove()
+      setSharingReport(false)
+    }
+  }
+
   const filteredPatients = useMemo(() => {
     const term = search.trim().toLowerCase()
     if (!term) return store.patients
@@ -441,6 +832,7 @@ function App() {
 
   const openTestDialog = (patientId = '') => {
     setSelectedPatientId(patientId)
+    setSelectedTestProfile('')
     setSelectedTestIds([])
     setTestDialog(true)
   }
@@ -472,8 +864,13 @@ function App() {
 
   const addTestOrder = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!selectedPatientId || !selectedTestIds.length) {
-      notify('Select a patient and at least one test.')
+    if (!selectedPatientId || !selectedTestProfile) {
+      notify('Select a patient, profile and at least one test.')
+      return
+    }
+    const availableTestIds = new Set(store.tests.filter((test) => belongsToProfile(test, selectedTestProfile)).map((test) => test.id))
+    if (!selectedTestIds.length || selectedTestIds.some((id) => !availableTestIds.has(id))) {
+      notify('Select a patient, profile and at least one test.')
       return
     }
     const existingIds = store.orders.map((item) => item.id)
@@ -545,9 +942,58 @@ function App() {
     return orderDate >= start
   })
 
+  const revenueAnchor = new Date(`${revenueDate}T00:00:00`)
+  const revenueStart = new Date(revenueAnchor)
+  const revenueEnd = new Date(revenueAnchor)
+  if (revenuePeriod === 'Weekly') {
+    revenueStart.setDate(revenueStart.getDate() - ((revenueStart.getDay() + 6) % 7))
+    revenueEnd.setTime(revenueStart.getTime())
+    revenueEnd.setDate(revenueEnd.getDate() + 6)
+  } else if (revenuePeriod === 'Monthly') {
+    revenueStart.setDate(1)
+    revenueEnd.setMonth(revenueEnd.getMonth() + 1, 0)
+  }
+  const revenueStartKey = dateInputValue(revenueStart)
+  const revenueEndKey = dateInputValue(revenueEnd)
+  const revenueOrders = store.orders.filter((order) => {
+    const orderDate = new Date(order.createdAt)
+    if (Number.isNaN(orderDate.getTime())) return false
+    const orderDateKey = dateInputValue(orderDate)
+    return orderDateKey >= revenueStartKey && orderDateKey <= revenueEndKey
+  })
+  const revenueTotal = revenueOrders.reduce((sum, order) => {
+    const price = getTest(store, order.testId)?.price ?? 0
+    return sum + (Number.isFinite(price) && price > 0 ? price : 0)
+  }, 0)
+  const unpricedRevenueOrders = revenueOrders.filter((order) => {
+    const price = getTest(store, order.testId)?.price ?? 0
+    return !Number.isFinite(price) || price <= 0
+  }).length
+  const revenueByDay = Array.from({ length: revenuePeriod === 'Daily' ? 1 : revenuePeriod === 'Weekly' ? 7 : revenueEnd.getDate() }, (_, index) => {
+    const date = new Date(revenueStart)
+    date.setDate(date.getDate() + index)
+    const dateKey = dateInputValue(date)
+    const orders = revenueOrders.filter((order) => dateInputValue(new Date(order.createdAt)) === dateKey)
+    const amount = orders.reduce((sum, order) => {
+      const price = getTest(store, order.testId)?.price ?? 0
+      return sum + (Number.isFinite(price) && price > 0 ? price : 0)
+    }, 0)
+    return { date, orders: orders.length, amount }
+  })
+  const doctorRevenue = summarizeRevenueByPerson(revenueOrders, store, store.referrers, (patient) => patient.referrerId, t('Unassigned'))
+  const technicianRevenue = summarizeRevenueByPerson(revenueOrders, store, store.labTechnicians, (patient) => patient.labTechnicianId, t('Unassigned'))
+  const collectorRevenue = summarizeRevenueByPerson(revenueOrders, store, store.sampleCollectors, (patient) => patient.sampleCollectorId, t('Unassigned'))
+  const revenueDateFormatter = new Intl.DateTimeFormat(dateLocale(uiLanguage), { day: '2-digit', month: 'short', year: 'numeric' })
+  const revenueRangeLabel = revenuePeriod === 'Daily'
+    ? revenueDateFormatter.format(revenueStart)
+    : `${revenueDateFormatter.format(revenueStart)} – ${revenueDateFormatter.format(revenueEnd)}`
+
   const selectedReportPatient = reportPatientId ? store.patients.find((patient) => patient.id === reportPatientId) : undefined
   const selectedPatientOrders = reportPatientId
     ? store.orders.filter((order) => order.patientId === reportPatientId && (!reportOrderIds || reportOrderIds.includes(order.id)))
+    : []
+  const selectedProfileTests = selectedTestProfile
+    ? store.tests.filter((test) => belongsToProfile(test, selectedTestProfile))
     : []
   const generationOrders = generationPatientId
     ? store.orders.filter((order) => order.patientId === generationPatientId)
@@ -565,7 +1011,7 @@ function App() {
     setAiInterpretation(null)
     try {
       const healthResponse = await fetch('/api/health')
-      const health = await healthResponse.json() as { available?: boolean; provider?: string; model?: string; error?: string }
+      const health = await readApiJson<{ available?: boolean; provider?: string; model?: string; error?: string }>(healthResponse)
       if (!healthResponse.ok || !health.available) {
         throw new Error(health.error ?? 'The configured cloud AI provider is unavailable.')
       }
@@ -575,6 +1021,7 @@ function App() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           language: aiLanguage,
+          patientAge: selectedReportPatient?.age ?? null,
           tests: selectedPatientOrders.map((order) => ({
             name: getTest(store, order.testId)?.name ?? 'Unknown test',
             parameters: getTestParameters(store, order).map((parameter) => ({
@@ -586,7 +1033,7 @@ function App() {
           })),
         }),
       })
-      const result = await response.json() as { interpretation?: string; provider?: string; model?: string; error?: string }
+      const result = await readApiJson<{ interpretation?: string; provider?: string; model?: string; error?: string }>(response)
       if (!response.ok || !result.interpretation) {
         throw new Error(result.error ?? 'Could not generate an explanation. Please try again.')
       }
@@ -602,7 +1049,7 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-mode={appearance.mode} data-accent={appearance.accent}>
       <aside className="sidebar">
         <a className="brand" href="#" onClick={(event) => { event.preventDefault(); setSection('overview') }}>
           <span className="brand-mark"><Icon name="flask" size={21} /></span>
@@ -614,9 +1061,11 @@ function App() {
           <div className="nav-separator" />
           <button className={`nav-item ${section === 'masters' ? 'active' : ''}`} onClick={() => setSection('masters')}><Icon name="masters" /><span>{t('Masters')}</span></button>
           <button className={`nav-item ${section === 'patients' ? 'active' : ''}`} onClick={() => setSection('patients')}><Icon name="patients" /><span>{t('Patients')}</span><span className="nav-count">{store.patients.length}</span></button>
+          <button className={`nav-item ${section === 'attendance' ? 'active' : ''}`} onClick={openAttendance}><Icon name="clock" /><span>{t('Attendance')}</span></button>
           <button className={`nav-item ${section === 'results' ? 'active' : ''}`} onClick={() => setSection('results')}><Icon name="flask" /><span>{t('Test results')}</span>{pendingCount > 0 && <span className="nav-count warning">{pendingCount}</span>}</button>
           <button className={`nav-item ${section === 'report-generation' ? 'active' : ''}`} onClick={() => setSection('report-generation')}><Icon name="print" /><span>{t('Report generation')}</span></button>
           <button className={`nav-item ${section === 'reports' ? 'active' : ''}`} onClick={() => setSection('reports')}><Icon name="report" /><span>{t('Reports')}</span></button>
+          <button className={`nav-item ${section === 'revenue' ? 'active' : ''}`} onClick={() => setSection('revenue')}><Icon name="trend" /><span>{t('Revenue')}</span></button>
         </nav>
         <div className="sidebar-bottom">
           <div className="support-card">
@@ -635,10 +1084,20 @@ function App() {
 
       <main className="main-panel">
         <header className="topbar">
-          <div className="breadcrumbs"><span>Prime AI Lab</span><span className="crumb-slash">/</span><strong>{t(section === 'overview' ? 'Overview' : section === 'results' ? 'Test results' : section === 'report-generation' ? 'Report generation' : section === 'masters' ? 'Masters' : section === 'patients' ? 'Patients' : 'Reports')}</strong></div>
+          <div className="breadcrumbs"><span>Prime AI Lab</span><span className="crumb-slash">/</span><strong>{t(section === 'overview' ? 'Overview' : section === 'results' ? 'Test results' : section === 'report-generation' ? 'Report generation' : section === 'masters' ? 'Masters' : section === 'patients' ? 'Patients' : section === 'attendance' ? 'Attendance' : section === 'revenue' ? 'Revenue' : 'Reports')}</strong></div>
           <div className="topbar-actions">
             <label className="global-search"><Icon name="search" size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('Search patients, tests...')} aria-label={t('Search patients and tests')} /><kbd>⌘ K</kbd></label>
             <label className="ui-language-picker"><span>{t('Language')}</span><select aria-label={t('Language')} value={uiLanguage} onChange={(event) => { const language = event.target.value; if (language === 'en' || language === 'mr' || language === 'hi') changeUiLanguage(language) }}><option value="en">English</option><option value="mr">मराठी</option><option value="hi">हिन्दी</option></select></label>
+            <details className="appearance-menu">
+              <summary className="icon-button appearance-trigger" aria-label={t('Appearance')} title={t('Appearance')}><Icon name="palette" size={18} /></summary>
+              <div className="appearance-panel">
+                <div className="appearance-panel-heading"><strong>{t('Appearance')}</strong><small>{t('Personalize the app colors.')}</small></div>
+                <label className="appearance-mode-picker">{t('Display mode')}<select value={appearance.mode} onChange={(event) => { const mode = event.target.value; if (mode === 'light' || mode === 'dark') updateAppearance({ ...appearance, mode }) }}><option value="light">{t('Light')}</option><option value="dark">{t('Dark')}</option></select></label>
+                <div className="appearance-theme-picker"><span>{t('Accent theme')}</span><div className="theme-choice-grid" role="group" aria-label={t('Accent theme')}>
+                  {accentThemes.map((theme) => <button key={theme.id} type="button" className={`theme-choice ${appearance.accent === theme.id ? 'selected' : ''}`} aria-label={t(theme.label)} aria-pressed={appearance.accent === theme.id} title={t(theme.label)} onClick={() => updateAppearance({ ...appearance, accent: theme.id })}><span className="theme-swatch" style={{ backgroundColor: theme.color }} /><small>{t(theme.label)}</small></button>)}
+                </div></div>
+              </div>
+            </details>
             <button className="icon-button notification-button" aria-label={t('Notifications')}><Icon name="bell" size={18} /><i /></button>
             <div className="topbar-divider" />
             <span className="today-date">{new Intl.DateTimeFormat(dateLocale(uiLanguage), { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date())}</span>
@@ -704,9 +1163,64 @@ function App() {
                 {masterTab === 'lab-technicians' && <table><thead><tr><th>{t('LAB TECHNICIAN')}</th><th>{t('DEPARTMENT / SPECIALTY')}</th><th>{t('PHONE')}</th><th>{t('ASSIGNED PATIENTS')}</th><th /></tr></thead><tbody>{store.labTechnicians.filter((technician) => !search || `${technician.name} ${technician.specialty} ${technician.phone}`.toLowerCase().includes(search.toLowerCase())).map((technician, index) => <tr key={technician.id}><td><div className="person-cell"><span className={`avatar avatar-${index % 4}`}>{technician.name.split(' ').slice(-1)[0].slice(0, 1)}</span><strong>{technician.name}</strong></div></td><td>{technician.specialty}</td><td>{technician.phone || '—'}</td><td>{store.patients.filter((patient) => patient.labTechnicianId === technician.id).length} {t('Patients').toLowerCase()}</td><td><button className="row-action" aria-label={`${t('Add patient for')} ${technician.name}`} onClick={() => { setPatientDraft({ name: '', age: '', gender: 'Female', phone: '', labTechnicianId: technician.id, sampleCollectorId: '', referrerId: '' }); setPatientDialog(true) }}>•••</button></td></tr>)}</tbody></table>}
                 {masterTab === 'referrers' && <table><thead><tr><th>{t('REFERRAL PARTNER')}</th><th>{t('ORGANIZATION')}</th><th>{t('PHONE')}</th><th>{t('REFERRED PATIENTS')}</th><th /></tr></thead><tbody>{store.referrers.filter((referrer) => !search || `${referrer.name} ${referrer.organization} ${referrer.phone}`.toLowerCase().includes(search.toLowerCase())).map((referrer, index) => <tr key={referrer.id}><td><div className="person-cell"><span className={`avatar avatar-${(index + 2) % 4}`}>{referrer.name.split(' ').slice(-1)[0].slice(0, 1)}</span><strong>{referrer.name}</strong></div></td><td>{referrer.organization}</td><td>{referrer.phone || '—'}</td><td>{store.patients.filter((patient) => patient.referrerId === referrer.id).length} {t('Patients').toLowerCase()}</td><td><button className="row-action" aria-label={`${t('Referral partner actions for')} ${referrer.name}`}>•••</button></td></tr>)}</tbody></table>}
                 {masterTab === 'sample-collectors' && <table><thead><tr><th>{t('SAMPLE COLLECTOR')}</th><th>{t('PHONE')}</th><th>{t('ASSIGNED PATIENTS')}</th><th /></tr></thead><tbody>{store.sampleCollectors.filter((collector) => !search || `${collector.name} ${collector.phone}`.toLowerCase().includes(search.toLowerCase())).map((collector, index) => <tr key={collector.id}><td><div className="person-cell"><span className={`avatar avatar-${index % 4}`}>{collector.name.split(' ').slice(-1)[0].slice(0, 1)}</span><strong>{collector.name}</strong></div></td><td>{collector.phone || '—'}</td><td>{store.patients.filter((patient) => patient.sampleCollectorId === collector.id).length} {t('Patients').toLowerCase()}</td><td><button className="row-action" aria-label={`${t('Add patient for')} ${collector.name}`} onClick={() => { setPatientDraft({ name: '', age: '', gender: 'Female', phone: '', labTechnicianId: '', sampleCollectorId: collector.id, referrerId: '' }); setPatientDialog(true) }}>•••</button></td></tr>)}</tbody></table>}
-                {masterTab === 'tests' && <table><thead><tr><th>{t('TEST NAME')}</th><th>{t('CATEGORY')}</th><th>{t('PRICE')}</th><th>{t('PARAMETERS')}</th><th /></tr></thead><tbody>{store.tests.filter((test) => !search || `${test.name} ${test.category} ${test.parameters?.map((parameter) => parameter.name).join(' ') ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((test) => <tr key={test.id}><td><div className="test-name-cell"><span className="test-row-icon"><Icon name="flask" size={16} /></span><strong>{test.name}</strong></div></td><td><span className="category-tag">{test.category}</span></td><td>₹{test.price.toLocaleString(dateLocale(uiLanguage))}</td><td>{test.parameters?.length ? test.parameters.map((parameter) => parameter.name).join(', ') : `Result${test.unit ? ` · ${test.unit}` : ''}${test.reference ? ` · ${test.reference}` : ''}`}</td><td><button className="row-action" aria-label={`${t('Actions for')} ${test.name}`}>•••</button></td></tr>)}</tbody></table>}
+                {masterTab === 'tests' && <table><thead><tr><th>{t('TEST NAME')}</th><th>{t('CATEGORY')}</th><th>{t('PRICE')}</th><th>{t('PARAMETERS')}</th><th /></tr></thead><tbody>{store.tests.filter((test) => !search || `${test.name} ${test.category} ${test.parameters?.map((parameter) => parameter.name).join(' ') ?? ''}`.toLowerCase().includes(search.toLowerCase())).map((test) => <tr key={test.id}><td><div className="test-name-cell"><span className="test-row-icon"><Icon name="flask" size={16} /></span><span className="test-name-copy"><strong>{test.name}</strong><small>{test.profiles?.length ? test.profiles.map((profile) => t(testProfiles.find((item) => item.id === profile)?.label ?? 'Other tests')).join(', ') : t('Other tests')}</small></span></div></td><td><span className="category-tag">{test.category}</span></td><td>{test.price ? `₹${test.price.toLocaleString(dateLocale(uiLanguage))}` : t('Price not set')}</td><td>{test.parameters?.length ? test.parameters.map((parameter) => parameter.name).join(', ') : `Result${test.unit ? ` · ${test.unit}` : ''}${test.reference ? ` · ${test.reference}` : ''}`}</td><td><button className="row-action" aria-label={`${t('Actions for')} ${test.name}`}>•••</button></td></tr>)}</tbody></table>}
                 <div className="table-footer"><span>{t('Showing')} {masterTabDetails[masterTab].count} {t('records')}</span><span>{t('Demo data is stored in this browser')}</span></div>
               </div>
+            </section>
+          )}
+
+          {section === 'attendance' && !headAuthenticated && (
+            <section className="page-section">
+              <div className="page-heading"><div><span className="eyebrow">{t('RESTRICTED AREA')}</span><h1>{t('Head login')}</h1><p>{t('Log in to manage lab technician attendance.')}</p></div></div>
+              <div className="attendance-login-card panel">
+                <form className="dialog-form" onSubmit={loginHead}>
+                  <p className="form-intro">{t('Only the lab head should access the attendance manager.')}</p>
+                  <label>{t('Username')}<input required autoComplete="username" value={headUsername} onChange={(event) => setHeadUsername(event.target.value)} /></label>
+                  <label>{t('Password')}<input required type="password" autoComplete="current-password" value={headPassword} onChange={(event) => setHeadPassword(event.target.value)} /></label>
+                  {headLoginError && <p className="attendance-login-error" role="alert">{headLoginError}</p>}
+                  <button type="submit" className="button button-primary">{t('Log in')}</button>
+                </form>
+                <p className="attendance-security-note">{t('Demo login only: it is not secure authentication and does not protect browser data.')}</p>
+              </div>
+            </section>
+          )}
+
+          {section === 'attendance' && headAuthenticated && (
+            <section className="page-section">
+              <div className="page-heading">
+                <div><span className="eyebrow">{t('LAB WORKFLOW')}</span><h1>{t('Technician attendance')}</h1><p>{t('Manage daily attendance for lab technicians.')}</p></div>
+                <button className="button button-outline" onClick={logoutHead}>{t('Log out')}</button>
+              </div>
+              <div className="result-cards attendance-summary">
+                <div className="result-card"><span className="result-number">{store.attendance.filter((record) => record.date === attendanceDate && record.status === 'Present').length}</span><span>{t('Present')}</span></div>
+                <div className="result-card"><span className="result-number">{store.attendance.filter((record) => record.date === attendanceDate && record.status === 'Absent').length}</span><span>{t('Absent')}</span></div>
+                <div className="result-card"><span className="result-number">{store.attendance.filter((record) => record.date === attendanceDate && record.status === 'Leave').length}</span><span>{t('Leave')}</span></div>
+                <div className="result-card"><span className="result-number">{store.labTechnicians.length - store.attendance.filter((record) => record.date === attendanceDate).length}</span><span>{t('Not marked')}</span></div>
+              </div>
+              <div className="panel list-panel attendance-list-panel">
+                <div className="list-toolbar"><div><h2>{t('Attendance register')}</h2><p>{t('Select a status for each lab technician. Changes save in this browser.')}</p></div><label className="attendance-date-picker"><span>{t('Date')}</span><input type="date" value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)} /></label></div>
+                <table><thead><tr><th>{t('LAB TECHNICIAN')}</th><th>{t('DEPARTMENT / SPECIALTY')}</th><th>{t('ATTENDANCE STATUS')}</th></tr></thead><tbody>
+                  {store.labTechnicians.map((technician) => {
+                    const record = store.attendance.find((item) => item.labTechnicianId === technician.id && item.date === attendanceDate)
+                    return <tr key={technician.id}>
+                      <td><div className="person-cell"><span className="avatar">{technician.name.split(' ').slice(-1)[0].slice(0, 1)}</span><strong>{technician.name}</strong></div></td>
+                      <td>{technician.specialty}</td>
+                      <td><select className="attendance-status-select" aria-label={`${t('Attendance status for')} ${technician.name}`} value={record?.status ?? ''} onChange={(event) => {
+                        const value = event.target.value
+                        if (value === '' || value === 'Present' || value === 'Absent' || value === 'Leave') setTechnicianAttendance(technician.id, value)
+                      }}>
+                        <option value="">{t('Not marked')}</option>
+                        <option value="Present">{t('Present')}</option>
+                        <option value="Absent">{t('Absent')}</option>
+                        <option value="Leave">{t('Leave')}</option>
+                      </select></td>
+                    </tr>
+                  })}
+                  {!store.labTechnicians.length && <tr><td className="empty-cell" colSpan={3}>{t('No lab technicians found.')}</td></tr>}
+                </tbody></table>
+                <div className="table-footer"><span>{store.labTechnicians.length} {t('Lab technicians').toLowerCase()}</span><span>{t('Attendance is stored in this browser.')}</span></div>
+              </div>
+              <p className="demo-notice">{t('Demo login only: it is not secure authentication and does not protect browser data.')}</p>
             </section>
           )}
 
@@ -782,7 +1296,7 @@ function App() {
                             <td><input className="result-input generation-result-input" aria-label={`${parameter.name} ${t('for')} ${getPatientName(store, generationPatientId)}`} placeholder={t('Enter result')} value={resultDrafts[draftKey] ?? getParameterResult(order, parameter)} onChange={(event) => updateParameterResult(order, parameter, event.target.value)} /></td>
                             <td>{parameter.unit || '—'}</td>
                             <td>{parameter.reference || '—'}</td>
-                            {index === 0 && <td rowSpan={parameters.length}><button className="button button-small button-outline" onClick={() => openTestReport(generationPatientId, [order.id])}><Icon name="print" size={14} /> {t('Print test')}</button></td>}
+                            {index === 0 && <td rowSpan={parameters.length}><div className="print-action"><button className="button button-small button-outline" onClick={() => openTestReport(generationPatientId, [order.id])}><Icon name="print" size={14} /> {t('Print test')}</button>{order.printedAt && <span className="printed-indicator" title={`${t('Report already printed')} · ${formatDate(order.printedAt, uiLanguage)}`} aria-label={t('Report already printed')}><Icon name="check" size={15} /></span>}</div></td>}
                           </tr>
                         })
                       })}
@@ -824,6 +1338,39 @@ function App() {
               <p className="demo-notice">{t('Reports and analytics are based on the records currently saved in this browser.')}</p>
             </section>
           )}
+
+          {section === 'revenue' && (
+            <section className="page-section">
+              <div className="page-heading"><div><span className="eyebrow">{t('REVENUE OVERVIEW')}</span><h1>{t('Revenue')}</h1><p>{t('See estimated business by date and assigned staff.')}</p></div></div>
+              <div className="revenue-toolbar">
+                <div className="report-period-tabs" role="group" aria-label={t('Revenue period')}>
+                  {(['Daily', 'Weekly', 'Monthly'] as const).map((period) => <button key={period} className={revenuePeriod === period ? 'selected' : ''} aria-pressed={revenuePeriod === period} onClick={() => setRevenuePeriod(period)}>{t(period)}</button>)}
+                </div>
+                <label className="revenue-date-control"><span>{t('Select date')}</span><input type="date" value={revenueDate} onChange={(event) => { if (event.target.value) setRevenueDate(event.target.value) }} /></label>
+              </div>
+              <p className="revenue-range-label">{revenueRangeLabel}</p>
+              <div className="stats-grid revenue-stats">
+                <article className="stat-card"><span className="stat-label">{t('Total estimated revenue')}</span><strong>{formatRevenue(revenueTotal, uiLanguage)}</strong><small>{t('Based on test catalogue prices')}</small></article>
+                <article className="stat-card"><span className="stat-label">{t('Test orders')}</span><strong>{revenueOrders.length.toLocaleString(dateLocale(uiLanguage))}</strong><small>{t('Orders in selected period')}</small></article>
+                <article className="stat-card"><span className="stat-label">{t('Orders without price')}</span><strong>{unpricedRevenueOrders.toLocaleString(dateLocale(uiLanguage))}</strong><small>{t('Not included in estimated revenue')}</small></article>
+              </div>
+              <article className="panel revenue-daily-panel">
+                <div className="panel-heading"><div><h2>{t('Revenue by date')}</h2><p>{revenueRangeLabel}</p></div></div>
+                <div className="revenue-table-wrap">
+                  <table className="revenue-table revenue-date-table">
+                    <thead><tr><th>{t('Date')}</th><th>{t('Test orders')}</th><th>{t('Business')}</th></tr></thead>
+                    <tbody>{revenueByDay.map((day) => <tr key={dateInputValue(day.date)}><td>{new Intl.DateTimeFormat(dateLocale(uiLanguage), { weekday: revenuePeriod === 'Daily' ? 'long' : 'short', day: 'numeric', month: revenuePeriod === 'Daily' ? 'long' : 'short', year: revenuePeriod === 'Daily' ? 'numeric' : undefined }).format(day.date)}</td><td>{day.orders.toLocaleString(dateLocale(uiLanguage))}</td><td><strong>{formatRevenue(day.amount, uiLanguage)}</strong></td></tr>)}</tbody>
+                  </table>
+                </div>
+              </article>
+              <div className="revenue-breakdown-grid">
+                <RevenueBreakdownPanel title={t('Doctor / referrer')} rows={doctorRevenue} language={uiLanguage} />
+                <RevenueBreakdownPanel title={t('Lab technicians')} rows={technicianRevenue} language={uiLanguage} />
+                <RevenueBreakdownPanel title={t('Sample collectors')} rows={collectorRevenue} language={uiLanguage} />
+              </div>
+              <p className="demo-notice">{t('Revenue is estimated from current catalogue prices for orders placed in the selected period. Orders without a price are not included; this is not a payment or profit report.')}</p>
+            </section>
+          )}
         </div>
       </main>
 
@@ -841,10 +1388,12 @@ function App() {
 
       {testDialog && <Dialog title={t('Add a test order')} onClose={() => setTestDialog(false)} language={uiLanguage}>
         <form className="dialog-form" onSubmit={addTestOrder}>
-          <p className="form-intro">{t('Select a patient and one or more tests. Each selected test will create its own order with the required result parameters.')}</p>
+          <p className="form-intro">{t('Select a patient and profile, then choose one or more tests from that profile.')}</p>
           <label>{t('Patient')}<select required value={selectedPatientId} onChange={(event) => setSelectedPatientId(event.target.value)}><option value="">{t('Select patient')}</option>{store.patients.map((patient) => <option key={patient.id} value={patient.id}>{patient.name} · {patient.id}</option>)}</select></label>
+          <label>{t('Test profile')}<select required value={selectedTestProfile} onChange={(event) => { setSelectedTestProfile(event.target.value as TestProfile | ''); setSelectedTestIds([]) }}><option value="">{t('Select test profile')}</option>{testProfiles.map((profile) => <option key={profile.id} value={profile.id}>{t(profile.label)}</option>)}</select></label>
           <fieldset className="test-selection"><legend>{t('Tests')} <span>{selectedTestIds.length} {t('selected')}</span></legend>
-            {store.tests.map((test) => <label className="test-option" key={test.id}><input type="checkbox" checked={selectedTestIds.includes(test.id)} onChange={(event) => setSelectedTestIds(event.target.checked ? [...selectedTestIds, test.id] : selectedTestIds.filter((id) => id !== test.id))} /><span><strong>{test.name}</strong><small>{test.category}{test.parameters?.length ? ` · ${test.parameters.length} ${t('parameters')}` : ''}</small></span><b>₹{test.price.toLocaleString(dateLocale(uiLanguage))}</b></label>)}
+            {!selectedTestProfile && <p className="empty-message">{t('Select a profile to see its tests.')}</p>}
+            {selectedTestProfile && selectedProfileTests.map((test) => <label className="test-option" key={test.id}><input type="checkbox" checked={selectedTestIds.includes(test.id)} onChange={(event) => setSelectedTestIds(event.target.checked ? [...selectedTestIds, test.id] : selectedTestIds.filter((id) => id !== test.id))} /><span><strong>{test.name}</strong><small>{test.category}{test.parameters?.length ? ` · ${test.parameters.length} ${t('parameters')}` : ''}</small></span><b>{test.price ? `₹${test.price.toLocaleString(dateLocale(uiLanguage))}` : t('Price not set')}</b></label>)}
           </fieldset>
           <div className="dialog-actions"><button type="button" className="button button-outline" onClick={() => setTestDialog(false)}>{t('Cancel')}</button><button type="submit" className="button button-primary" disabled={!selectedPatientId || !selectedTestIds.length}>{t('Add')} {selectedTestIds.length || ''} {t('Add to queue')}</button></div>
         </form>
@@ -873,20 +1422,20 @@ function App() {
       </Dialog>}
 
       {selectedReportPatient && <Dialog title={t('Patient report')} onClose={() => { setReportPatientId(null); setReportOrderIds(null); setAiInterpretation(null); setAiError('') }} className="report-dialog" language={uiLanguage}>
-        <div className="report-toolbar"><span className="status-pill status-complete"><i /> {t('Review before release')}</span><button className="button button-outline button-small" onClick={() => window.print()}><Icon name="print" size={15} /> {t('Print report')}</button></div>
-        <div className="printable-report">
+        <div className="report-toolbar"><span className="status-pill status-complete"><i /> {t('Review before release')}</span><div className="report-toolbar-actions"><button className="button button-outline button-small" disabled={sharingReport} onClick={sharePatientReportOnWhatsApp}>{sharingReport ? t('Creating PDF…') : t('Send PDF on WhatsApp')}</button><button className="button button-outline button-small" onClick={printPatientReport}><Icon name="print" size={15} /> {t('Print report')}</button></div></div>
+        <div className="printable-report" ref={reportRef}>
           <div className="report-brand"><span className="brand-mark"><Icon name="flask" size={19} /></span><div><strong>PRIME AI LAB</strong><small>{t('LABORATORY TEST REPORT')}</small></div></div>
           <div className="report-patient-info"><div><small>{t('PATIENT NAME')}</small><strong>{selectedReportPatient.name}</strong></div><div><small>{t('PATIENT ID')}</small><strong>{selectedReportPatient.id}</strong></div><div><small>{t('AGE / GENDER')}</small><strong>{selectedReportPatient.age} {t('yrs')} / {t(selectedReportPatient.gender)}</strong></div><div><small>{t('REPORT DATE')}</small><strong>{formatDate(new Date().toISOString(), uiLanguage)}</strong></div><div><small>{t('LAB TECHNICIAN')}</small><strong>{getLabTechnician(store, selectedReportPatient.labTechnicianId)}</strong></div><div><small>{t('SAMPLE COLLECTOR')}</small><strong>{getSampleCollector(store, selectedReportPatient.sampleCollectorId)}</strong></div><div><small>{t('REFERRED BY')}</small><strong>{getReferrer(store, selectedReportPatient.referrerId)}</strong></div></div>
-          <table className="report-results-table"><thead><tr><th>{t('TEST')}</th><th>{t('PARAMETER')}</th><th>{t('RESULT')}</th><th>{t('UNIT')}</th><th>{t('REFERENCE RANGE')}</th><th>{t('Status').toUpperCase()}</th></tr></thead><tbody>{selectedPatientOrders.flatMap((order) => {
+          <div className="report-results-scroll"><table className="report-results-table"><thead><tr><th>{t('TEST')}</th><th>{t('PARAMETER')}</th><th>{t('RESULT')}</th><th>{t('UNIT')}</th><th>{t('REFERENCE RANGE')}</th><th>{t('Status').toUpperCase()}</th></tr></thead><tbody>{selectedPatientOrders.flatMap((order) => {
             const test = getTest(store, order.testId)
             return getTestParameters(store, order).map((parameter) => <tr key={`${order.id}:${parameter.id}`}><td>{test?.name ?? t('Test removed')}</td><td>{parameter.name}</td><td><strong>{getParameterResult(order, parameter) || t('Pending')}</strong></td><td>{parameter.unit || '—'}</td><td>{parameter.reference || '—'}</td><td>{t(order.status)}</td></tr>)
-          })}</tbody></table>
+          })}</tbody></table></div>
           <section className="ai-interpretation" aria-live="polite">
-            <div className="ai-interpretation-heading"><div><strong><Icon name="spark" size={15} /> {t('Plain-language explanation')}</strong><small>{t('Cloud AI · test results are sent; patient identity is not')}</small></div><div className="ai-controls"><label htmlFor="ai-language">{t('Language')}</label><select id="ai-language" value={aiLanguage} onChange={(event) => { const language = event.target.value; if (language === 'Marathi' || language === 'English' || language === 'Hindi') setAiLanguage(language) }}><option value="Marathi">मराठी</option><option value="English">English</option><option value="Hindi">हिन्दी</option></select><button className="button button-small button-primary" disabled={aiLoading || !selectedPatientOrders.length} onClick={generateAiInterpretation}><Icon name="spark" size={14} />{aiLoading ? t('Generating…') : t('Explain results')}</button></div></div>
+            <div className="ai-interpretation-heading"><div><strong><Icon name="spark" size={15} /> {t('Plain-language explanation')}</strong><small>{t('Cloud AI · test results and age are sent; name, ID, and phone are not')}</small></div><div className="ai-controls"><label htmlFor="ai-language">{t('Language')}</label><select id="ai-language" value={aiLanguage} onChange={(event) => { const language = event.target.value; if (language === 'Marathi' || language === 'English' || language === 'Hindi') setAiLanguage(language) }}><option value="Marathi">मराठी</option><option value="English">English</option><option value="Hindi">हिन्दी</option></select><button className="button button-small button-primary" disabled={aiLoading || !selectedPatientOrders.length} onClick={generateAiInterpretation}><Icon name="spark" size={14} />{aiLoading ? t('Generating…') : t('Explain results')}</button></div></div>
             {aiError && <p className="ai-error" role="alert">{aiError}</p>}
             {aiLoading && <p className="ai-status">{t('The selected cloud AI provider is preparing a short explanation. Keep this report open.')}</p>}
             {aiInterpretation && <div className="ai-interpretation-result"><span>{t('Generated with')} {aiInterpretation.model}</span><p>{aiInterpretation.text}</p></div>}
-            {!aiError && !aiLoading && !aiInterpretation && <p className="ai-status">{t('Explanation compares results only with the reference ranges shown. It is educational, not a diagnosis; clinician review is required.')}</p>}
+            {!aiError && !aiLoading && !aiInterpretation && <p className="ai-status">{t('Explanation compares values with the shown ranges and may describe general possible contributors and safe next steps. It is educational, not a diagnosis or treatment; clinician review is required.')}</p>}
           </section>
           <div className="ai-disclaimer"><span><Icon name="spark" size={17} /></span><p><strong>{t('AI-assisted explanation')}</strong><br />{t('The optional AI text is educational and may be inaccurate. It is not a diagnosis or treatment advice. A qualified professional must verify results and review the report before release.')}</p></div>
           <div className="report-signoff"><span>{t('Authorized by: ____________________')}</span><span>{t('Signature: ____________________')}</span></div>
