@@ -10,6 +10,7 @@ import {
   ReportsPage,
   ResultsPage,
   RevenuePage,
+  StoreExpenditurePage,
   WorkflowDialogs,
 } from '@/features'
 import { accentThemes } from '@/shared/data/initialStore'
@@ -34,6 +35,7 @@ export function AppLayout() {
           <button className={`nav-item ${section === 'results' ? 'active' : ''}`} onClick={() => setSection('results')}><Icon name="flask" /><span>{t('Test results')}</span>{pendingCount > 0 && <span className="nav-count warning">{pendingCount}</span>}</button>
           <button className={`nav-item ${section === 'report-generation' ? 'active' : ''}`} onClick={() => setSection('report-generation')}><Icon name="print" /><span>{t('Report generation')}</span></button>
           <button className={`nav-item ${section === 'reports' ? 'active' : ''}`} onClick={() => setSection('reports')}><Icon name="report" /><span>{t('Reports')}</span></button>
+          <button className={`nav-item ${section === 'store-expenditure' ? 'active' : ''}`} onClick={() => setSection('store-expenditure')}><Icon name="masters" /><span>{t('Store & Expenditure')}</span></button>
         </nav>
         <div className="sidebar-bottom">
           <div className="support-card">
@@ -52,7 +54,7 @@ export function AppLayout() {
 
       <main className="main-panel">
         <header className="topbar">
-          <div className="breadcrumbs"><span>Prime AI Lab</span><span className="crumb-slash">/</span><strong>{t(section === 'overview' ? 'Overview' : section === 'results' ? 'Test results' : section === 'report-generation' ? 'Report generation' : section === 'masters' ? 'Masters' : section === 'patients' ? 'Patients' : section === 'administration' ? 'Administration' : 'Reports')}</strong></div>
+          <div className="breadcrumbs"><span>Prime AI Lab</span><span className="crumb-slash">/</span><strong>{t(section === 'overview' ? 'Overview' : section === 'results' ? 'Test results' : section === 'report-generation' ? 'Report generation' : section === 'masters' ? 'Masters' : section === 'patients' ? 'Patients' : section === 'administration' ? 'Administration' : section === 'store-expenditure' ? 'Store & Expenditure' : 'Reports')}</strong></div>
           <div className="topbar-actions">
             <label className="global-search"><Icon name="search" size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('Search patients, tests...')} aria-label={t('Search patients and tests')} /><kbd>⌘ K</kbd></label>
             <label className="ui-language-picker"><span>{t('Language')}</span><select aria-label={t('Language')} value={uiLanguage} onChange={(event) => { const language = event.target.value; if (language === 'en' || language === 'mr' || language === 'hi') changeUiLanguage(language) }}><option value="en">English</option><option value="mr">मराठी</option><option value="hi">हिन्दी</option></select></label>
@@ -108,6 +110,7 @@ export function AppLayout() {
           <ReportGenerationPage />
           <ReportsPage />
           <RevenuePage />
+          <StoreExpenditurePage />
         </div>
       </main>
 
