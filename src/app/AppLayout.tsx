@@ -53,7 +53,7 @@ export function AppLayout() {
         </div>
       </aside>
 
-      <main className="main-panel">
+      <main className={`main-panel ${section === 'store-expenditure' ? 'store-expenditure-main' : ''}`}>
         <header className="topbar">
           <div className="breadcrumbs"><span>Prime AI Lab</span><span className="crumb-slash">/</span><strong>{t(section === 'overview' ? 'Overview' : section === 'results' ? 'Test results' : section === 'report-generation' ? 'Report generation' : section === 'masters' ? 'Masters' : section === 'patients' ? 'Patients' : section === 'attendance' ? 'Attendance' : section === 'revenue' ? 'Revenue' : section === 'store-expenditure' ? 'Store & Expenditure' : 'Reports')}</strong></div>
           <div className="topbar-actions">

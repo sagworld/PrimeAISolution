@@ -6,6 +6,7 @@ export type {
   BillStatusFilter,
   ImportBill,
   InventoryRow,
+  PaymentMethod,
   StockDeductionResult,
   StoreExpenditureData,
   StoreExpenditureErrorCode,

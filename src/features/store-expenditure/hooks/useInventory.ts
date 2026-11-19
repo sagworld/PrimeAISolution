@@ -21,6 +21,7 @@ export function useInventory() {
     setLowStockOnly,
     addItem: storeExpenditureService.addItem.bind(storeExpenditureService),
     updateItem: storeExpenditureService.updateItem.bind(storeExpenditureService),
+    removeItem: storeExpenditureService.removeItem.bind(storeExpenditureService),
     hasBills: (item: StoreItem) => hasBillsForItem(data, item),
   }
 }
