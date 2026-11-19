@@ -58,6 +58,31 @@ export function InventoryTable({
           <TableTotalRow cells={['Total', '—', '—', '—', '—', formatStoreCurrency(totalExpenditure, locale), '—', '—']} />
         </table>
       </div>
+      <div className="store-mobile-card-list" role="region" aria-label="Inventory items">
+        {items.map((item) => {
+          const low = item.currentStock < item.threshold
+          return (
+            <article className={`store-mobile-item-card${low ? ' is-low' : ''}`} key={item.id}>
+              <div className="store-mobile-item-heading">
+                <div><h3>{item.name}</h3><span>{item.category} · {unitLabel(item.unit)}</span></div>
+                <StockStatusBadge low={low} />
+              </div>
+              <div className="store-mobile-item-stats">
+                <div><span>Used</span><strong>{item.usedQuantity.toLocaleString(locale, { maximumFractionDigits: 2 })}</strong></div>
+                <div><span>Remaining</span><strong>{item.currentStock.toLocaleString(locale, { maximumFractionDigits: 2 })}</strong></div>
+                <div><span>Expenditure</span><strong>{formatStoreCurrency(item.totalExpenditure, locale)}</strong></div>
+              </div>
+              <div className="store-mobile-item-actions">
+                <button type="button" className="button button-outline" aria-label={`Import ${item.name}`} onClick={() => onImport(item)}>Import</button>
+                <button type="button" className="button button-outline" aria-label={`Edit ${item.name}`} onClick={() => onEdit(item)}>Edit</button>
+                <button type="button" className="button button-outline store-remove-button" aria-label={`Remove ${item.name}`} onClick={() => onRemove(item)}>Remove</button>
+              </div>
+            </article>
+          )
+        })}
+        {!items.length && <p className="store-mobile-empty">No inventory items match these filters.</p>}
+        <div className="store-mobile-list-total"><span>Total expenditure</span><strong>{formatStoreCurrency(totalExpenditure, locale)}</strong></div>
+      </div>
     </div>
   )
 }

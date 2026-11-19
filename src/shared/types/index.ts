@@ -1,4 +1,4 @@
-export type Section = 'overview' | 'masters' | 'patients' | 'administration' | 'results' | 'report-generation' | 'reports' | 'store-expenditure'
+export type Section = 'overview' | 'masters' | 'patients' | 'administration' | 'results' | 'report-generation' | 'reports' | 'store-expenditure' | 'billing'
 export type AdministrationTab = 'attendance' | 'revenue'
 export type MasterTab = 'lab-technicians' | 'referrers' | 'sample-collectors' | 'tests'
 export type ReportPeriod = 'Daily' | 'Weekly' | 'Monthly'
