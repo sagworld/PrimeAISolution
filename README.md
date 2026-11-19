@@ -31,6 +31,7 @@ Gemini is the default provider (`gemini-3.5-flash-lite`); Groq defaults to `open
 - Review daily, weekly and monthly collections with basic category analysis.
 - Open the Administration area to sign in and switch between the horizontal Attendance and Revenue tabs. Attendance supports a date range, a separate attendance date picker, P/A/L status buttons saved with the Save attendance button, technician-wise summaries and editable date-grouped history for all saved records. Revenue groups Doctor/referrer, Lab technicians and Sample collectors into tabs, with daily, weekly and monthly filters for the selected category; a custom date range is also available. The demo login is `head` / `lab123`; the browser-only login is not real access control.
 - Review estimated revenue by selected day, week or month, including daily totals and doctor/referrer, technician and sample-collector breakdowns. Figures use current test-catalogue prices and are not payment or profit records.
+- Create and print patient invoices, track paid/unpaid totals, send invoice details through WhatsApp, save a payment QR for printed invoices, and export invoices as Tally XML. Billing records and payment QR images are stored only in this browser; this demo is not a payment processor or accounting integration.
 - Optionally generate a cloud AI explanation of supplied test values in Marathi, English, or Hindi.
 - Persist demo workspace state in the browser's local storage.
 
