@@ -3,13 +3,18 @@ import { PatientRegistrationDialog } from '@/features/workflows/PatientRegistrat
 import { PatientReportDialog } from '@/features/workflows/PatientReportDialog'
 import { TestOrderDialog } from '@/features/workflows/TestOrderDialog'
 
-export function WorkflowDialogs() {
+export function WorkflowDialogs({ sampleCollectorMode = false, sampleCollectorId = '', editingPatientId = null, onEditingPatientComplete }: { sampleCollectorMode?: boolean; sampleCollectorId?: string; editingPatientId?: string | null; onEditingPatientComplete?: () => void }) {
   return (
     <>
-      <PatientRegistrationDialog />
-      <TestOrderDialog />
-      <MasterRecordDialog />
-      <PatientReportDialog />
+      <PatientRegistrationDialog
+        sampleCollectorMode={sampleCollectorMode}
+        sampleCollectorId={sampleCollectorId}
+        editingPatientId={editingPatientId}
+        onEditingComplete={onEditingPatientComplete}
+      />
+      <TestOrderDialog sampleCollectorMode={sampleCollectorMode} />
+      {!sampleCollectorMode && <MasterRecordDialog />}
+      <PatientReportDialog sampleCollectorMode={sampleCollectorMode} />
     </>
   )
 }

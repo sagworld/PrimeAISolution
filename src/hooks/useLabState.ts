@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { type UiLanguage } from '@/i18n'
 import type {
   AppearanceSettings,
@@ -14,6 +14,7 @@ import type {
 } from '@/shared/types'
 import { dateInputValue, explanationLanguage } from '@/shared/utils/appUtils'
 import { readAppearance, readStore, readUiLanguage } from '@/services/browserStorage'
+import { STORAGE_KEY } from '@/shared/data/initialStore'
 import { translate } from '@/i18n'
 
 export function useLabState() {
@@ -59,6 +60,15 @@ export function useLabState() {
   const [resultDrafts, setResultDrafts] = useState<Record<string, string>>({})
   const [toast, setToast] = useState('')
   const t = (text: string) => translate(uiLanguage, text)
+
+  useEffect(() => {
+    const syncStoreFromOtherTab = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY && event.key !== null) return
+      setStore(readStore())
+    }
+    window.addEventListener('storage', syncStoreFromOtherTab)
+    return () => window.removeEventListener('storage', syncStoreFromOtherTab)
+  }, [])
 
   return {
     store, setStore, uiLanguage, setUiLanguage, appearance, setAppearance, section, setSection,

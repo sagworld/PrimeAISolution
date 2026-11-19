@@ -28,7 +28,7 @@ export function useLabWorkflows(state: LabAppState, { persist, notify }: AppCore
     setMasterDialog(tab)
   }
 
-  const addPatient = (event: FormEvent<HTMLFormElement>) => {
+  const addPatient = (event: FormEvent<HTMLFormElement>, createdBySampleCollector = false) => {
     event.preventDefault()
     const patient: Patient = {
       id: nextRecordId('PT-', store.patients.map((item) => item.id), 4),
@@ -39,12 +39,40 @@ export function useLabWorkflows(state: LabAppState, { persist, notify }: AppCore
       labTechnicianId: patientDraft.labTechnicianId,
       sampleCollectorId: patientDraft.sampleCollectorId,
       referrerId: patientDraft.referrerId,
+      createdBySampleCollector,
       createdAt: new Date().toISOString(),
     }
     persist({ ...store, patients: [patient, ...store.patients] })
     setPatientDraft({ name: '', age: '', gender: 'Female', phone: '', labTechnicianId: '', sampleCollectorId: '', referrerId: '' })
     setPatientDialog(false)
     notify('Patient registered successfully.')
+  }
+
+  const updatePatient = (patientId: string, event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const currentPatient = store.patients.find((patient) => patient.id === patientId)
+    if (!currentPatient) {
+      notify('Patient record could not be found.')
+      return false
+    }
+    const updatedPatient: Patient = {
+      ...currentPatient,
+      name: patientDraft.name.trim(),
+      age: Number(patientDraft.age),
+      gender: patientDraft.gender,
+      phone: patientDraft.phone.trim(),
+      labTechnicianId: patientDraft.labTechnicianId,
+      sampleCollectorId: currentPatient.createdBySampleCollector ? currentPatient.sampleCollectorId : patientDraft.sampleCollectorId,
+      referrerId: currentPatient.createdBySampleCollector ? currentPatient.referrerId : patientDraft.referrerId,
+    }
+    persist({
+      ...store,
+      patients: store.patients.map((patient) => patient.id === patientId ? updatedPatient : patient),
+    })
+    setPatientDraft({ name: '', age: '', gender: 'Female', phone: '', labTechnicianId: '', sampleCollectorId: '', referrerId: '' })
+    setPatientDialog(false)
+    notify('Patient details updated successfully.')
+    return true
   }
 
   const addTestOrder = (event: FormEvent<HTMLFormElement>) => {
@@ -143,5 +171,5 @@ export function useLabWorkflows(state: LabAppState, { persist, notify }: AppCore
     tests: { label: t('Test catalogue'), singular: t('test'), count: store.tests.length },
   }
 
-  return { openTestDialog, openMasterDialog, addPatient, addTestOrder, addMaster, selectedProfileTests, generationOrders, masterTabDetails }
+  return { openTestDialog, openMasterDialog, addPatient, updatePatient, addTestOrder, addMaster, selectedProfileTests, generationOrders, masterTabDetails }
 }

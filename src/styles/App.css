@@ -5261,3 +5261,276 @@ kbd {
     padding: 14px 12px;
   }
 }
+
+.role-login-shell {
+  display: grid;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 12% 16%, rgba(22, 132, 102, 0.1), transparent 28rem),
+    #f7f8fa;
+}
+
+.role-login-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 28px;
+}
+
+.role-login-card {
+  width: min(100%, 480px);
+  padding: 36px;
+  border: 1px solid #e8edef;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(27, 43, 44, 0.1);
+}
+
+.role-login-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 38px;
+}
+
+.role-login-card h1 {
+  margin: 8px 0;
+  color: #1b2b2c;
+  font-size: 28px;
+  letter-spacing: -0.8px;
+}
+
+.role-login-intro,
+.role-login-notice {
+  color: #718082;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.role-login-options {
+  display: grid;
+  gap: 11px;
+  margin: 25px 0 19px;
+}
+
+.role-login-collector-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e5ebec;
+  border-radius: 11px;
+  background: #f8faf9;
+}
+
+.role-login-collector-form label {
+  display: grid;
+  gap: 7px;
+  color: #657476;
+  font-size: 12px;
+}
+
+.role-login-collector-form select {
+  min-width: 0;
+  height: 39px;
+  padding: 0 10px;
+  border: 1px solid #dfe6e7;
+  border-radius: 7px;
+  background: #fff;
+  color: #263638;
+}
+
+.role-login-collector-form > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #718082;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.role-login-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 13px;
+  padding: 15px;
+  border: 1px solid #e5ebec;
+  border-radius: 11px;
+  background: #fff;
+  color: #263638;
+  text-align: left;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.role-login-option:hover,
+.role-login-option:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  outline: none;
+}
+
+.role-login-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.role-login-option > span:nth-child(2) {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+}
+
+.role-login-option strong {
+  color: #263638;
+  font-size: 14px;
+  text-transform: capitalize;
+}
+
+.role-login-option small {
+  color: #718082;
+  font-size: 12px;
+}
+
+.role-login-arrow {
+  color: var(--accent);
+  font-size: 20px;
+}
+
+.role-login-notice {
+  margin: 0;
+  padding-top: 15px;
+  border-top: 1px solid #edf0f1;
+  font-size: 11px;
+}
+
+.role-session-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #657476;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.patient-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.collector-test-status-list {
+  display: grid;
+  min-width: 290px;
+  gap: 7px;
+}
+
+.collector-test-status-row {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.collector-test-status-row > span:first-child {
+  font-size: 12px;
+}
+
+@media (max-width: 920px) {
+  .collector-test-status-list {
+    min-width: 260px;
+  }
+
+  .collector-test-status-row {
+    grid-template-columns: minmax(90px, 1fr) auto;
+  }
+
+  .collector-test-status-row .button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+.app-shell[data-mode='dark'] .role-login-card,
+.app-shell[data-mode='dark'] .role-login-option {
+  border-color: #34413f;
+  background: #1b2624;
+}
+
+.app-shell[data-mode='dark'] .role-login-collector-form {
+  border-color: #34413f;
+  background: #15201e;
+}
+
+.app-shell[data-mode='dark'] .role-login-collector-form label,
+.app-shell[data-mode='dark'] .role-login-collector-form > p {
+  color: #9eadaa;
+}
+
+.app-shell[data-mode='dark'] .role-login-collector-form select {
+  border-color: #3a4946;
+  background: #1b2624;
+  color: #d7e1de;
+}
+
+.app-shell[data-mode='dark'] .role-login-card h1,
+.app-shell[data-mode='dark'] .role-login-option strong {
+  color: #d7e1de;
+}
+
+.app-shell[data-mode='dark'] .role-login-intro,
+.app-shell[data-mode='dark'] .role-login-notice,
+.app-shell[data-mode='dark'] .role-login-option small {
+  color: #9eadaa;
+}
+
+.app-shell[data-mode='dark'] .role-login-option:hover,
+.app-shell[data-mode='dark'] .role-login-option:focus-visible {
+  border-color: var(--accent-border);
+  background: #202c2a;
+}
+
+.app-shell[data-mode='dark'] .role-login-notice {
+  border-color: #34413f;
+}
+
+@media (max-width: 640px) {
+  .role-login-page {
+    padding: 16px;
+  }
+
+  .role-login-card {
+    padding: 25px 20px;
+  }
+
+  .role-login-brand {
+    margin-bottom: 30px;
+  }
+
+  .role-login-option {
+    padding: 12px;
+  }
+
+  .role-login-collector-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .role-login-collector-form > .button {
+    width: 100%;
+  }
+
+  .role-session-control {
+    gap: 0;
+  }
+
+  .role-session-control > span {
+    display: none;
+  }
+}

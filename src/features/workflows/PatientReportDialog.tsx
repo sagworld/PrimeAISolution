@@ -4,7 +4,7 @@ import { Dialog } from '@/shared/components/Dialog'
 import { Icon } from '@/shared/components/Icon'
 import { formatDate, getLabTechnician, getReferrer, getSampleCollector, getTest, getTestParameters, getParameterResult, isParameterGroupStart, normalizeIndianMobileNumber } from '@/shared/utils/appUtils'
 
-export function PatientReportDialog() {
+export function PatientReportDialog({ sampleCollectorMode = false }: { sampleCollectorMode?: boolean }) {
   const { store, uiLanguage, setReportPatientId, setReportOrderIds, aiLanguage, setAiLanguage, aiInterpretation, setAiInterpretation, aiLoading, aiError, setAiError, sharingReport, reportPdfReady, reportPdfError, preparingReportPdf, reportRef, t, printPatientReport, downloadPatientReportPdf, sharePatientReportOnWhatsApp, selectedReportPatient, selectedPatientOrders, generateAiInterpretation } = useAppContext()
   const [whatsAppNumber, setWhatsAppNumber] = useState('')
   const [whatsAppNumberError, setWhatsAppNumberError] = useState('')
@@ -27,13 +27,17 @@ export function PatientReportDialog() {
     <>
       {selectedReportPatient && <Dialog title={t('Patient report')} onClose={() => { setReportPatientId(null); setReportOrderIds(null); setAiInterpretation(null); setAiError('') }} className="report-dialog" language={uiLanguage}>
         <div className="report-toolbar">
-          <span className="status-pill status-complete"><i /> {t('Review before release')}</span>
-          <label className="report-share-recipient"><span>{t('WhatsApp number')}</span><input type="tel" autoComplete="tel" value={whatsAppNumber} aria-invalid={Boolean(whatsAppNumberError)} aria-describedby={whatsAppNumberError ? 'whatsapp-number-error' : undefined} onChange={(event) => { setWhatsAppNumber(event.target.value); setWhatsAppNumberError('') }} />{whatsAppNumberError && <small id="whatsapp-number-error" role="alert">{whatsAppNumberError}</small>}</label>
-          <div className="report-toolbar-actions">
-            <button className="button button-outline button-small" disabled={sharingReport || preparingReportPdf} onClick={downloadPatientReportPdf}><Icon name="download" size={14} /> {preparingReportPdf ? t('Creating PDF…') : t('Download PDF')}</button>
-            <button className="button button-primary button-small" disabled={sharingReport || preparingReportPdf || !reportPdfReady} onClick={shareReport}><Icon name="whatsapp" size={15} /> {preparingReportPdf ? t('Creating PDF…') : sharingReport ? t('Sharing…') : t('Share on WhatsApp')}</button>
-            <button className="button button-outline button-small" onClick={printPatientReport}><Icon name="print" size={15} /> {t('Print report')}</button>
-          </div>
+        {sampleCollectorMode
+          ? <div className="report-toolbar-actions"><button className="button button-primary button-small" disabled={!selectedPatientOrders.length || selectedPatientOrders.some((order) => order.status !== 'Completed')} onClick={printPatientReport}><Icon name="print" size={15} /> {t('Print test')}</button></div>
+          : <>
+            <span className="status-pill status-complete"><i /> {t('Review before release')}</span>
+            <label className="report-share-recipient"><span>{t('WhatsApp number')}</span><input type="tel" autoComplete="tel" value={whatsAppNumber} aria-invalid={Boolean(whatsAppNumberError)} aria-describedby={whatsAppNumberError ? 'whatsapp-number-error' : undefined} onChange={(event) => { setWhatsAppNumber(event.target.value); setWhatsAppNumberError('') }} />{whatsAppNumberError && <small id="whatsapp-number-error" role="alert">{whatsAppNumberError}</small>}</label>
+            <div className="report-toolbar-actions">
+              <button className="button button-outline button-small" disabled={sharingReport || preparingReportPdf} onClick={downloadPatientReportPdf}><Icon name="download" size={14} /> {preparingReportPdf ? t('Creating PDF…') : t('Download PDF')}</button>
+              <button className="button button-primary button-small" disabled={sharingReport || preparingReportPdf || !reportPdfReady} onClick={shareReport}><Icon name="whatsapp" size={15} /> {preparingReportPdf ? t('Creating PDF…') : sharingReport ? t('Sharing…') : t('Share on WhatsApp')}</button>
+              <button className="button button-outline button-small" onClick={printPatientReport}><Icon name="print" size={15} /> {t('Print report')}</button>
+            </div>
+          </>}
         </div>
         {reportPdfError && <p className="ai-error" role="alert">{t(reportPdfError)}</p>}
         <div className="printable-report" ref={reportRef}>
@@ -44,14 +48,14 @@ export function PatientReportDialog() {
             const parameters = getTestParameters(store, order)
             return parameters.map((parameter, index) => <tr key={`${order.id}:${parameter.id}`}><td>{test?.name ?? t('Test removed')}</td><td>{isParameterGroupStart(parameters, index) && <strong className="parameter-group-label">{parameter.groupName}</strong>}{parameter.name}</td><td><strong>{getParameterResult(order, parameter) || t('Pending')}</strong></td><td>{parameter.unit || '—'}</td><td>{parameter.reference || '—'}</td><td>{t(order.status)}</td></tr>)
           })}</tbody></table></div>
-          <section className="ai-interpretation" aria-live="polite">
+          {!sampleCollectorMode && <section className="ai-interpretation" aria-live="polite">
             <div className="ai-interpretation-heading"><div><strong><Icon name="spark" size={15} /> {t('Plain-language explanation')}</strong><small>{t('Cloud AI · test results and age are sent; name, ID, and phone are not')}</small></div><div className="ai-controls"><label htmlFor="ai-language">{t('Language')}</label><select id="ai-language" value={aiLanguage} onChange={(event) => { const language = event.target.value; if (language === 'Marathi' || language === 'English' || language === 'Hindi') setAiLanguage(language) }}><option value="Marathi">मराठी</option><option value="English">English</option><option value="Hindi">हिन्दी</option></select><button className="button button-small button-primary" disabled={aiLoading || !selectedPatientOrders.length} onClick={generateAiInterpretation}><Icon name="spark" size={14} />{aiLoading ? t('Generating…') : t('Explain results')}</button></div></div>
             {aiError && <p className="ai-error" role="alert">{aiError}</p>}
             {aiLoading && <p className="ai-status">{t('The selected cloud AI provider is preparing a short explanation. Keep this report open.')}</p>}
             {aiInterpretation && <div className="ai-interpretation-result"><span>{t('Generated with')} {aiInterpretation.model}</span><p>{aiInterpretation.text}</p></div>}
             {!aiError && !aiLoading && !aiInterpretation && <p className="ai-status">{t('Explanation compares values with the shown ranges and may describe general possible contributors and safe next steps. It is educational, not a diagnosis or treatment; clinician review is required.')}</p>}
-          </section>
-          <div className="ai-disclaimer"><span><Icon name="spark" size={17} /></span><p><strong>{t('AI-assisted explanation')}</strong><br />{t('The optional AI text is educational and may be inaccurate. It is not a diagnosis or treatment advice. A qualified professional must verify results and review the report before release.')}</p></div>
+          </section>}
+          {!sampleCollectorMode && <div className="ai-disclaimer"><span><Icon name="spark" size={17} /></span><p><strong>{t('AI-assisted explanation')}</strong><br />{t('The optional AI text is educational and may be inaccurate. It is not a diagnosis or treatment advice. A qualified professional must verify results and review the report before release.')}</p></div>}
           <div className="report-signoff"><span>{t('Authorized by: ____________________')}</span><span>{t('Signature: ____________________')}</span></div>
           <p className="report-footer-note">{t('Confidential laboratory record · Prepared for professional review')}</p>
         </div>

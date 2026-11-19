@@ -24,6 +24,7 @@ export type Patient = {
   labTechnicianId: string
   sampleCollectorId: string
   referrerId: string
+  createdBySampleCollector?: boolean
   createdAt: string
 }
 export type AttendanceRecord = { id: string; labTechnicianId: string; date: string; status: AttendanceStatus; updatedAt: string }

@@ -4,14 +4,14 @@ import { dateLocale } from '@/i18n'
 import { testProfiles } from '@/shared/data/initialStore'
 import type { TestProfile } from '@/shared/types'
 
-export function TestOrderDialog() {
+export function TestOrderDialog({ sampleCollectorMode = false }: { sampleCollectorMode?: boolean }) {
   const { store, uiLanguage, testDialog, setTestDialog, selectedPatientId, setSelectedPatientId, selectedTestProfile, setSelectedTestProfile, selectedTestIds, setSelectedTestIds, t, addTestOrder, selectedProfileTests } = useAppContext()
   return (
     <>
       {testDialog && <Dialog title={t('Add a test order')} onClose={() => setTestDialog(false)} language={uiLanguage}>
         <form className="dialog-form" onSubmit={addTestOrder}>
           <p className="form-intro">{t('Select a patient and profile, then choose one or more tests from that profile.')}</p>
-          <label>{t('Patient')}<select required value={selectedPatientId} onChange={(event) => setSelectedPatientId(event.target.value)}><option value="">{t('Select patient')}</option>{store.patients.map((patient) => <option key={patient.id} value={patient.id}>{patient.name} · {patient.id}</option>)}</select></label>
+          <label>{t('Patient')}<select required disabled={sampleCollectorMode} value={selectedPatientId} onChange={(event) => setSelectedPatientId(event.target.value)}><option value="">{t('Select patient')}</option>{store.patients.map((patient) => <option key={patient.id} value={patient.id}>{patient.name} · {patient.id}</option>)}</select></label>
           <label>{t('Test profile')}<select required value={selectedTestProfile} onChange={(event) => { setSelectedTestProfile(event.target.value as TestProfile | ''); setSelectedTestIds([]) }}><option value="">{t('Select test profile')}</option>{testProfiles.map((profile) => <option key={profile.id} value={profile.id}>{t(profile.label)}</option>)}</select></label>
           <fieldset className="test-selection"><legend>{t('Tests')} <span>{selectedTestIds.length} {t('selected')}</span></legend>
             {!selectedTestProfile && <p className="empty-message">{t('Select a profile to see its tests.')}</p>}
