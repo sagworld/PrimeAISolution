@@ -5,7 +5,7 @@ import { Icon } from '@/shared/components/Icon'
 import { formatDate, getLabTechnician, getReferrer, getSampleCollector, getTest, getTestParameters, getParameterResult, isParameterGroupStart, normalizeIndianMobileNumber } from '@/shared/utils/appUtils'
 
 export function PatientReportDialog() {
-  const { store, uiLanguage, setReportPatientId, setReportOrderIds, aiLanguage, setAiLanguage, aiInterpretation, setAiInterpretation, aiLoading, aiError, setAiError, sharingReport, reportRef, t, printPatientReport, downloadPatientReportPdf, sharePatientReportOnWhatsApp, selectedReportPatient, selectedPatientOrders, generateAiInterpretation } = useAppContext()
+  const { store, uiLanguage, setReportPatientId, setReportOrderIds, aiLanguage, setAiLanguage, aiInterpretation, setAiInterpretation, aiLoading, aiError, setAiError, sharingReport, reportPdfReady, reportPdfError, preparingReportPdf, reportRef, t, printPatientReport, downloadPatientReportPdf, sharePatientReportOnWhatsApp, selectedReportPatient, selectedPatientOrders, generateAiInterpretation } = useAppContext()
   const [whatsAppNumber, setWhatsAppNumber] = useState('')
   const [whatsAppNumberError, setWhatsAppNumberError] = useState('')
 
@@ -30,11 +30,12 @@ export function PatientReportDialog() {
           <span className="status-pill status-complete"><i /> {t('Review before release')}</span>
           <label className="report-share-recipient"><span>{t('WhatsApp number')}</span><input type="tel" autoComplete="tel" value={whatsAppNumber} aria-invalid={Boolean(whatsAppNumberError)} aria-describedby={whatsAppNumberError ? 'whatsapp-number-error' : undefined} onChange={(event) => { setWhatsAppNumber(event.target.value); setWhatsAppNumberError('') }} />{whatsAppNumberError && <small id="whatsapp-number-error" role="alert">{whatsAppNumberError}</small>}</label>
           <div className="report-toolbar-actions">
-            <button className="button button-outline button-small" disabled={sharingReport} onClick={downloadPatientReportPdf}><Icon name="download" size={14} /> {sharingReport ? t('Creating PDF…') : t('Download PDF')}</button>
-            <button className="button button-primary button-small" disabled={sharingReport} onClick={shareReport}><Icon name="whatsapp" size={15} /> {sharingReport ? t('Creating PDF…') : t('Share on WhatsApp')}</button>
+            <button className="button button-outline button-small" disabled={sharingReport || preparingReportPdf} onClick={downloadPatientReportPdf}><Icon name="download" size={14} /> {preparingReportPdf ? t('Creating PDF…') : t('Download PDF')}</button>
+            <button className="button button-primary button-small" disabled={sharingReport || preparingReportPdf || !reportPdfReady} onClick={shareReport}><Icon name="whatsapp" size={15} /> {preparingReportPdf ? t('Creating PDF…') : sharingReport ? t('Sharing…') : t('Share on WhatsApp')}</button>
             <button className="button button-outline button-small" onClick={printPatientReport}><Icon name="print" size={15} /> {t('Print report')}</button>
           </div>
         </div>
+        {reportPdfError && <p className="ai-error" role="alert">{t(reportPdfError)}</p>}
         <div className="printable-report" ref={reportRef}>
           <div className="report-brand"><span className="brand-mark"><Icon name="flask" size={19} /></span><div><strong>PRIME AI LAB</strong><small>{t('LABORATORY TEST REPORT')}</small></div></div>
           <div className="report-patient-info"><div><small>{t('PATIENT NAME')}</small><strong>{selectedReportPatient.name}</strong></div><div><small>{t('PATIENT ID')}</small><strong>{selectedReportPatient.id}</strong></div><div><small>{t('AGE / GENDER')}</small><strong>{selectedReportPatient.age} {t('yrs')} / {t(selectedReportPatient.gender)}</strong></div><div><small>{t('REPORT DATE')}</small><strong>{formatDate(new Date().toISOString(), uiLanguage)}</strong></div><div><small>{t('LAB TECHNICIAN')}</small><strong>{getLabTechnician(store, selectedReportPatient.labTechnicianId)}</strong></div><div><small>{t('SAMPLE COLLECTOR')}</small><strong>{getSampleCollector(store, selectedReportPatient.sampleCollectorId)}</strong></div><div><small>{t('REFERRED BY')}</small><strong>{getReferrer(store, selectedReportPatient.referrerId)}</strong></div></div>
