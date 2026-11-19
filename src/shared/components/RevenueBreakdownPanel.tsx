@@ -13,7 +13,7 @@ export function RevenueBreakdownPanel({ title, rows, language }: { title: string
           <thead><tr><th>{t('Name')}</th><th>{t('Orders')}</th><th>{t('Business')}</th></tr></thead>
           <tbody>{rows.map((row) => <tr key={row.id}><td>{row.name}</td><td>{row.orders.toLocaleString(dateLocale(language))}</td><td><strong>{formatRevenue(row.amount, language)}</strong></td></tr>)}</tbody>
         </table>
-        {!rows.length && <p className="empty-message">{t('No staff found.')}</p>}
+        {!rows.length && <p className="empty-message">{t('No matching staff.')}</p>}
       </div>
     </article>
   )

@@ -29,8 +29,8 @@ Gemini is the default provider (`gemini-3.5-flash-lite`); Groq defaults to `open
 - Enter individual test parameters, track pending/completed orders, and prepare patient reports.
 - Generate a report for one test or print all tests for a selected patient. Sample CBC and Peripheral Blood Smear tests include parameter-level examples.
 - Review daily, weekly and monthly collections with basic category analysis.
+- Open the Administration area to sign in and switch between the horizontal Attendance and Revenue tabs. Attendance supports a date range, a separate attendance date picker, P/A/L status buttons saved with the Save attendance button, technician-wise summaries and editable date-grouped history for all saved records. Revenue groups Doctor/referrer, Lab technicians and Sample collectors into tabs, with daily, weekly and monthly filters for the selected category; a custom date range is also available. The demo login is `head` / `lab123`; the browser-only login is not real access control.
 - Review estimated revenue by selected day, week or month, including daily totals and doctor/referrer, technician and sample-collector breakdowns. Figures use current test-catalogue prices and are not payment or profit records.
-- Record daily lab-technician attendance from the Attendance tab. The demo Head login is `head` / `lab123`; the browser-only login is not real access control.
 - Optionally generate a cloud AI explanation of supplied test values in Marathi, English, or Hindi.
 - Persist demo workspace state in the browser's local storage.
 
