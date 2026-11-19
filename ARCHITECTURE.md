@@ -20,4 +20,16 @@ use a router.
 - `src/services/` contains browser persistence and API response handling.
 - `src/styles/App.css` contains the existing application styles.
 
+## Store & Expenditure
+
+`src/features/store-expenditure/` owns inventory and import-bill types,
+components, hooks, calculation utilities, and a localStorage-backed service.
+The feature is registered as a section in `AppLayout` and contains Inventory
+and Import Bills views. Expenditure is derived from import bills; adding an
+import persists its bill, optional initial payment, and stock increase
+together. Further payments are recorded against the bill and paid/balance
+amounts are derived from payment entries. Other features can call the public
+`deductStock(itemId, quantity)` API, which rejects non-positive quantities
+and returns a clear error without allowing stock below zero.
+
 The `@/` alias maps to `src/` in both TypeScript and Vite configuration.

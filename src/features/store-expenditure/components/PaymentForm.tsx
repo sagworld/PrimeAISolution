@@ -1,0 +1,48 @@
+import { useState, type FormEvent } from 'react'
+import { Dialog } from '@/shared/components/Dialog'
+import type { UiLanguage } from '@/i18n'
+import type { ImportBill } from '@/features/store-expenditure/types'
+import { formatStoreCurrency, getBillRemaining } from '@/features/store-expenditure/utils'
+
+export function PaymentForm({
+  bill,
+  locale,
+  language,
+  onSave,
+  onCancel,
+}: {
+  bill: ImportBill
+  locale: string
+  language: UiLanguage
+  onSave: (billId: string, amount: number) => void
+  onCancel: () => void
+}) {
+  const remaining = getBillRemaining(bill)
+  const [amount, setAmount] = useState(String(remaining))
+  const [error, setError] = useState('')
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError('')
+    try {
+      onSave(bill.id, Number(amount))
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to record this payment.')
+    }
+  }
+
+  return (
+    <Dialog title="Record bill payment" onClose={onCancel} language={language}>
+      <form className="dialog-form" onSubmit={submit}>
+        <p className="form-intro">{bill.itemName} · {bill.supplierName}</p>
+        <div className="store-payment-balance"><span>Outstanding balance</span><strong>{formatStoreCurrency(remaining, locale)}</strong></div>
+        <label>Payment amount (₹)<input autoFocus required type="number" min="0.01" max={remaining} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></label>
+        {error && <p className="store-form-error" role="alert">{error}</p>}
+        <div className="dialog-actions">
+          <button type="button" className="button button-outline" onClick={onCancel}>Cancel</button>
+          <button type="submit" className="button button-primary">Record payment</button>
+        </div>
+      </form>
+    </Dialog>
+  )
+}

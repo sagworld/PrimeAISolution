@@ -6,4 +6,5 @@ export { ReportGenerationPage } from '@/features/report-generation/ReportGenerat
 export { ReportsPage } from '@/features/reports/ReportsPage'
 export { ResultsPage } from '@/features/results/ResultsPage'
 export { RevenuePage } from '@/features/revenue/RevenuePage'
+export { StoreExpenditurePage } from '@/features/store-expenditure'
 export { WorkflowDialogs } from '@/features/workflows/WorkflowDialogs'
