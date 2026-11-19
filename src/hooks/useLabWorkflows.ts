@@ -8,8 +8,8 @@ import type { AppCoreActions } from '@/hooks/useAppCore'
 export function useLabWorkflows(state: LabAppState, { persist, notify }: AppCoreActions) {
   const {
     store, selectedPatientId, selectedTestProfile, selectedTestIds, patientDraft, masterDialog,
-    masterDraft, parameterDrafts, generationPatientId, setTestDialog, setSelectedPatientId,
-    setSelectedTestProfile, setSelectedTestIds, setMasterDraft, setParameterDrafts, setMasterDialog,
+    masterDraft, parameterDrafts, reagentDrafts, generationPatientId, setTestDialog, setSelectedPatientId,
+    setSelectedTestProfile, setSelectedTestIds, setMasterDraft, setParameterDrafts, setReagentDrafts, setMasterDialog,
     setPatientDraft, setPatientDialog,
   } = state
   const t = state.t
@@ -23,7 +23,8 @@ export function useLabWorkflows(state: LabAppState, { persist, notify }: AppCore
 
   const openMasterDialog = (tab: MasterTab) => {
     setMasterDraft({ name: '', specialty: '', organization: '', phone: '', category: '', price: '' })
-    setParameterDrafts([{ name: '', unit: '', reference: '' }])
+    setParameterDrafts([{ name: '', isGroup: false, parameters: [{ name: '', unit: '', reference: '' }] }])
+    setReagentDrafts([])
     setMasterDialog(tab)
   }
 
@@ -86,30 +87,46 @@ export function useLabWorkflows(state: LabAppState, { persist, notify }: AppCore
     } else if (masterDialog === 'sample-collectors') {
       persist({ ...store, sampleCollectors: [{ id: makeId('collector'), name: masterDraft.name.trim(), phone: masterDraft.phone.trim() }, ...store.sampleCollectors] })
     } else if (masterDialog === 'tests') {
-      const parameters = parameterDrafts.map((parameter, index) => ({
-        id: `${makeId('parameter')}-${index + 1}`,
-        name: parameter.name.trim(),
-        unit: parameter.unit.trim(),
-        reference: parameter.reference.trim(),
-      })).filter((parameter) => parameter.name)
+      if (reagentDrafts.some((reagent) => !reagent.itemId || !reagent.quantity.trim() || !Number.isFinite(Number(reagent.quantity)) || Number(reagent.quantity) <= 0 || Math.abs(Number(reagent.quantity) * 100 - Math.round(Number(reagent.quantity) * 100)) > 1e-8)) {
+        notify('Select a reagent and enter a valid quantity used.')
+        return
+      }
+      const testId = makeId('test')
+      let parameterIndex = 0
+      const parameters = parameterDrafts.flatMap((group, groupIndex) => {
+        const groupName = group.isGroup ? group.name.trim() : ''
+        const groupId = groupName ? `${testId}-group-${groupIndex + 1}` : ''
+        return group.parameters.map((parameter) => {
+          parameterIndex += 1
+          return {
+            id: `${makeId('parameter')}-${parameterIndex}`,
+            name: parameter.name.trim(),
+            unit: parameter.unit.trim(),
+            reference: parameter.reference.trim(),
+            ...(groupId ? { groupId, groupName } : {}),
+          }
+        })
+      }).filter((parameter) => parameter.name)
       if (!parameters.length) {
         notify('Add at least one named test parameter.')
         return
       }
       const test: LabTest = {
-        id: makeId('test'),
+        id: testId,
         name: masterDraft.name.trim(),
         category: masterDraft.category.trim(),
         price: Number(masterDraft.price),
         unit: '',
         reference: '',
         parameters,
+        reagents: reagentDrafts.map((reagent) => ({ itemId: reagent.itemId, quantity: Number(reagent.quantity) })),
       }
       persist({ ...store, tests: [test, ...store.tests] })
     }
     setMasterDialog(null)
     setMasterDraft({ name: '', specialty: '', organization: '', phone: '', category: '', price: '' })
-    setParameterDrafts([{ name: '', unit: '', reference: '' }])
+    setParameterDrafts([{ name: '', isGroup: false, parameters: [{ name: '', unit: '', reference: '' }] }])
+    setReagentDrafts([])
     notify('Master record added.')
   }
 

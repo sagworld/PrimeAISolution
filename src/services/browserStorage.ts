@@ -1,5 +1,5 @@
 import type { UiLanguage } from '@/i18n'
-import type { AppearanceSettings, LabOrder, LabTechnician, LabTest, PersistedPatient, Referrer, Store } from '@/shared/types'
+import type { AppearanceSettings, LabOrder, LabTechnician, LabTest, PersistedPatient, Referrer, Store, TestReagentUsage } from '@/shared/types'
 import { APPEARANCE_STORAGE_KEY, initialStore, STORAGE_KEY, UI_LANGUAGE_STORAGE_KEY } from '@/shared/data/initialStore'
 
 export function readUiLanguage(): UiLanguage {
@@ -29,6 +29,16 @@ export function readAppearance(): AppearanceSettings {
     console.error('Unable to load appearance preferences.', error)
   }
   return { mode: 'light', accent: 'mint' }
+}
+
+function isTestReagentUsage(value: unknown): value is TestReagentUsage {
+  return typeof value === 'object' && value !== null &&
+    'itemId' in value && typeof value.itemId === 'string' &&
+    'quantity' in value && typeof value.quantity === 'number' && Number.isFinite(value.quantity) && value.quantity > 0
+}
+
+function normalizeTestReagents(value: unknown) {
+  return Array.isArray(value) ? value.filter(isTestReagentUsage) : []
 }
 
 export function readStore(): Store {
@@ -67,11 +77,26 @@ export function readStore(): Store {
       const tests = initialStore.tests.map((defaultTest) => {
         const savedTest = savedStore.tests.find((test) => test.id === defaultTest.id)
         return savedTest
-          ? { ...defaultTest, ...savedTest, parameters: savedTest.parameters?.length ? savedTest.parameters : defaultTest.parameters }
+          ? {
+              ...defaultTest,
+              ...savedTest,
+              parameters: savedTest.parameters?.length
+                ? savedTest.parameters.map((parameter) => ({
+                    ...defaultTest.parameters?.find((item) => item.id === parameter.id),
+                    ...parameter,
+                    groupName: parameter.groupName ?? defaultTest.parameters?.find((item) => item.id === parameter.id)?.groupName,
+                    groupId: parameter.groupId ?? defaultTest.parameters?.find((item) => item.id === parameter.id)?.groupId,
+                  }))
+                : defaultTest.parameters,
+              reagents: normalizeTestReagents(savedTest.reagents),
+            }
           : defaultTest
       })
       const savedTestIds = new Set(tests.map((test) => test.id))
-      tests.push(...savedStore.tests.filter((test) => !savedTestIds.has(test.id)))
+      tests.push(...savedStore.tests.filter((test) => !savedTestIds.has(test.id)).map((test) => ({
+        ...test,
+        reagents: normalizeTestReagents(test.reagents),
+      })))
       const seededOrders = initialStore.orders.filter((order) => !savedStore.orders.some((savedOrder) => savedOrder.id === order.id))
       const orders = [...savedStore.orders, ...seededOrders].map((order) => {
         const test = tests.find((item) => item.id === order.testId)

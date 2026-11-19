@@ -54,7 +54,8 @@ export function useLabState() {
   const [selectedTestIds, setSelectedTestIds] = useState<string[]>([])
   const [patientDraft, setPatientDraft] = useState({ name: '', age: '', gender: 'Female', phone: '', labTechnicianId: '', sampleCollectorId: '', referrerId: '' })
   const [masterDraft, setMasterDraft] = useState({ name: '', specialty: '', organization: '', phone: '', category: '', price: '' })
-  const [parameterDrafts, setParameterDrafts] = useState([{ name: '', unit: '', reference: '' }])
+  const [parameterDrafts, setParameterDrafts] = useState([{ name: '', isGroup: false, parameters: [{ name: '', unit: '', reference: '' }] }])
+  const [reagentDrafts, setReagentDrafts] = useState<{ itemId: string; quantity: string }[]>([])
   const [resultDrafts, setResultDrafts] = useState<Record<string, string>>({})
   const [toast, setToast] = useState('')
   const t = (text: string) => translate(uiLanguage, text)
@@ -75,7 +76,8 @@ export function useLabState() {
     aiInterpretation, setAiInterpretation, aiLoading, setAiLoading, aiError, setAiError, sharingReport,
     setSharingReport, reportRef, selectedPatientId, setSelectedPatientId, selectedTestProfile,
     setSelectedTestProfile, selectedTestIds, setSelectedTestIds, patientDraft, setPatientDraft,
-    masterDraft, setMasterDraft, parameterDrafts, setParameterDrafts, resultDrafts, setResultDrafts,
+    masterDraft, setMasterDraft, parameterDrafts, setParameterDrafts, reagentDrafts, setReagentDrafts,
+    resultDrafts, setResultDrafts,
     toast, setToast, t,
   }
 }

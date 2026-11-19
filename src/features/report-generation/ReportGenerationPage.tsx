@@ -1,6 +1,6 @@
 import { useAppContext } from '@/context/useAppContext'
 import { Icon } from '@/shared/components/Icon'
-import { formatDate, getPatientName, getTest, getTestParameters, getParameterResult } from '@/shared/utils/appUtils'
+import { formatDate, getPatientName, getTest, getTestParameters, getParameterResult, isParameterGroupStart } from '@/shared/utils/appUtils'
 
 export function ReportGenerationPage() {
   const { store, uiLanguage, section, generationPatientId, setGenerationPatientId, resultDrafts, t, updateParameterResult, openTestReport, generationOrders } = useAppContext()
@@ -25,7 +25,7 @@ export function ReportGenerationPage() {
                           const draftKey = `${order.id}:${parameter.id}`
                           return <tr key={`${order.id}:${parameter.id}`}>
                             {index === 0 && <td rowSpan={parameters.length}><div className="generation-test-name"><strong>{test?.name ?? t('Test removed')}</strong><small>{order.id} · {t(order.status)}</small></div></td>}
-                            <td>{parameter.name}</td>
+                            <td>{isParameterGroupStart(parameters, index) && <strong className="parameter-group-label">{parameter.groupName}</strong>}{parameter.name}</td>
                             <td><input className="result-input generation-result-input" aria-label={`${parameter.name} ${t('for')} ${getPatientName(store, generationPatientId)}`} placeholder={t('Enter result')} value={resultDrafts[draftKey] ?? getParameterResult(order, parameter)} onChange={(event) => updateParameterResult(order, parameter, event.target.value)} /></td>
                             <td>{parameter.unit || '—'}</td>
                             <td>{parameter.reference || '—'}</td>

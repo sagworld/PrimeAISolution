@@ -12,12 +12,12 @@ export const accentThemes: { id: AccentTheme; label: string; color: string }[] =
   { id: 'rose', label: 'Rose', color: '#c75f76' },
 ]
 const cbcParameters: TestParameter[] = [
-  { id: 'hemoglobin', name: 'Hemoglobin (Hb)', unit: 'g/dL', reference: '12.0–17.5' },
-  { id: 'rbc-count', name: 'RBC Count', unit: 'million/µL', reference: '4.0–5.5' },
-  { id: 'wbc-count', name: 'WBC Count', unit: 'cells/µL', reference: '4,000–11,000' },
-  { id: 'platelet-count', name: 'Platelet Count', unit: 'cells/µL', reference: '150,000–450,000' },
-  { id: 'hematocrit', name: 'Hematocrit (PCV)', unit: '%', reference: '36–52' },
-  { id: 'mcv', name: 'MCV', unit: 'fL', reference: '80–100' },
+  { id: 'hemoglobin', name: 'Hemoglobin (Hb)', unit: 'g/dL', reference: '12.0–17.5', groupId: 'cbc-rbc', groupName: 'RBC' },
+  { id: 'rbc-count', name: 'RBC Count', unit: 'million/µL', reference: '4.0–5.5', groupId: 'cbc-rbc', groupName: 'RBC' },
+  { id: 'hematocrit', name: 'Hematocrit (PCV)', unit: '%', reference: '36–52', groupId: 'cbc-rbc', groupName: 'RBC' },
+  { id: 'mcv', name: 'MCV', unit: 'fL', reference: '80–100', groupId: 'cbc-rbc', groupName: 'RBC' },
+  { id: 'wbc-count', name: 'WBC Count', unit: 'cells/µL', reference: '4,000–11,000', groupId: 'cbc-wbc', groupName: 'WBC' },
+  { id: 'platelet-count', name: 'Platelet Count', unit: 'cells/µL', reference: '150,000–450,000', groupId: 'cbc-platelets', groupName: 'Platelets' },
 ]
 const smearParameters: TestParameter[] = [
   { id: 'rbc-morphology', name: 'RBC Morphology', unit: '' },

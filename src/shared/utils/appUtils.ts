@@ -37,6 +37,14 @@ export function getTestParameters(store: Store, order: LabOrder): TestParameter[
     : [{ id: test?.id ?? order.testId, name: 'Result', unit: test?.unit ?? '', reference: test?.reference ?? '' }]
 }
 
+export function isParameterGroupStart(parameters: TestParameter[], index: number) {
+  const parameter = parameters[index]
+  const previous = parameters[index - 1]
+  if (!parameter?.groupName) return false
+  if (parameter.groupId) return parameter.groupId !== previous?.groupId
+  return parameter.groupName !== previous?.groupName || Boolean(previous?.groupId)
+}
+
 export function getParameterResult(order: LabOrder, parameter: TestParameter) {
   return order.parameterResults?.[parameter.id] ?? (parameter.id === order.testId ? order.result : '')
 }

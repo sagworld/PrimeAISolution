@@ -1,7 +1,7 @@
 import { useAppContext } from '@/context/useAppContext'
 import type { OrderStatusFilter } from '@/shared/types'
 import { Icon } from '@/shared/components/Icon'
-import { formatDate, getPatientName, getTest, getTestParameters, getParameterResult } from '@/shared/utils/appUtils'
+import { formatDate, getPatientName, getTest, getTestParameters, getParameterResult, isParameterGroupStart } from '@/shared/utils/appUtils'
 
 export function ResultsPage() {
   const { store, uiLanguage, section, orderStatusFilter, setOrderStatusFilter, search, setSearch, resultDrafts, setResultDrafts, t, saveOrderResults, openPatientReport, filteredOrders, pendingCount, completedCount, openTestDialog } = useAppContext()
@@ -23,9 +23,9 @@ export function ResultsPage() {
                       <td><strong className="normal-weight">{test?.name ?? t('Test removed')}</strong></td>
                       <td>{formatDate(order.createdAt, uiLanguage)}</td>
                       <td>{isParameterized
-                        ? <div className="parameter-result-inputs">{parameters.map((parameter) => {
+                        ? <div className="parameter-result-inputs">{parameters.map((parameter, index) => {
                           const draftKey = `${order.id}:${parameter.id}`
-                          return <label key={parameter.id}><span>{parameter.name}{parameter.unit ? ` · ${parameter.unit}` : ''}</span><input className={`result-input ${order.status === 'Completed' ? 'result-input-complete' : ''}`} aria-label={`${parameter.name} ${t('result for')} ${order.id}`} placeholder={t('Enter result')} value={resultDrafts[draftKey] ?? getParameterResult(order, parameter)} onChange={(event) => setResultDrafts({ ...resultDrafts, [draftKey]: event.target.value })} /></label>
+                          return <div className="parameter-result-entry" key={parameter.id}>{isParameterGroupStart(parameters, index) && <strong className="parameter-group-label">{parameter.groupName}</strong>}<label><span>{parameter.name}{parameter.unit ? ` · ${parameter.unit}` : ''}</span><input className={`result-input ${order.status === 'Completed' ? 'result-input-complete' : ''}`} aria-label={`${parameter.name} ${t('result for')} ${order.id}`} placeholder={t('Enter result')} value={resultDrafts[draftKey] ?? getParameterResult(order, parameter)} onChange={(event) => setResultDrafts({ ...resultDrafts, [draftKey]: event.target.value })} /></label></div>
                         })}</div>
                         : <input className={`result-input ${order.status === 'Completed' ? 'result-input-complete' : ''}`} aria-label={`${t('Result for')} ${order.id}`} placeholder={t('Enter result')} value={resultDrafts[order.id] ?? order.result} onChange={(event) => setResultDrafts({ ...resultDrafts, [order.id]: event.target.value })} />}
                       </td>

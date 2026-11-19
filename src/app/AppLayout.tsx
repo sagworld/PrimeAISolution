@@ -38,12 +38,6 @@ export function AppLayout() {
           <button className={`nav-item ${section === 'store-expenditure' ? 'active' : ''}`} onClick={() => setSection('store-expenditure')}><Icon name="masters" /><span>{t('Store & Expenditure')}</span></button>
         </nav>
         <div className="sidebar-bottom">
-          <div className="support-card">
-            <span className="support-icon"><Icon name="spark" size={16} /></span>
-            <strong>{t('Lab workspace')}</strong>
-            <p>{t('Your data is saved in this browser.')}</p>
-            <span className="secure-label"><span /> {t('LOCAL DEMO MODE')}</span>
-          </div>
           <button className="profile-button">
             <span className="avatar">PS</span>
             <span className="profile-copy"><strong>Priya Singh</strong><small>{t('Lab administrator')}</small></span>

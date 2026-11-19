@@ -25,7 +25,8 @@ type NewImport = {
 }
 
 type StoredBill = Omit<ImportBill, 'payments'> & { payments?: BillPayment[] }
-type StoredData = { items: StoreItem[]; bills: StoredBill[] }
+type StoredData = { items: StoreItem[]; bills: StoredBill[]; deductedOrderIds?: string[] }
+type StockUsage = { itemId: string; quantity: number }
 
 export interface StoreExpenditureService {
   getSnapshot: () => StoreExpenditureData
@@ -35,6 +36,7 @@ export interface StoreExpenditureService {
   recordImport: (draft: NewImport) => ImportBill
   recordPayment: (billId: string, amount: number) => void
   deductStock: (itemId: string, quantity: number) => number
+  deductStockForOrder: (orderId: string, usages: StockUsage[]) => void
 }
 
 function isUnit(value: unknown): value is StoreUnit {
@@ -58,8 +60,9 @@ function isPayment(value: unknown): value is BillPayment {
 
 function isData(value: unknown): value is StoredData {
   if (typeof value !== 'object' || value === null || !('items' in value) || !('bills' in value)) return false
-  const data = value as { items: unknown; bills: unknown }
+  const data = value as { items: unknown; bills: unknown; deductedOrderIds?: unknown }
   if (!Array.isArray(data.items) || !Array.isArray(data.bills)) return false
+  if ('deductedOrderIds' in data && (!Array.isArray(data.deductedOrderIds) || !data.deductedOrderIds.every((id) => typeof id === 'string'))) return false
   const items: unknown[] = data.items
   const bills: unknown[] = data.bills
   return items.every((item) =>
@@ -99,6 +102,7 @@ function migrateData(data: StoredData): StoreExpenditureData {
       currentStock: fromScaledInteger(Math.min(toScaledInteger(item.currentStock), importedByItem.get(item.id) ?? 0)),
     })),
     bills: data.bills.map((bill) => ({ ...bill, payments: bill.payments ?? [] })),
+    deductedOrderIds: data.deductedOrderIds ?? [],
   }
 }
 
@@ -198,6 +202,7 @@ export class LocalStoreExpenditureService implements StoreExpenditureService {
     }
     const nextStock = fromScaledInteger(toScaledInteger(item.currentStock) + toScaledInteger(draft.quantity))
     this.commit({
+      ...this.snapshot,
       items: this.snapshot.items.map((candidate) => candidate.id === item.id ? { ...candidate, currentStock: nextStock } : candidate),
       bills: [...this.snapshot.bills, bill],
     })
@@ -235,6 +240,37 @@ export class LocalStoreExpenditureService implements StoreExpenditureService {
     return remainingStock
   }
 
+  deductStockForOrder(orderId: string, usages: StockUsage[]) {
+    if (!orderId.trim()) throw new StoreExpenditureError('invalid-input', 'A test order is required to deduct reagent stock.')
+    if (this.snapshot.deductedOrderIds.includes(orderId)) return
+    if (!usages.length) throw new StoreExpenditureError('invalid-input', 'At least one reagent usage is required.')
+
+    const quantities = new Map<string, number>()
+    for (const usage of usages) {
+      validateQuantity(usage.quantity)
+      const current = quantities.get(usage.itemId) ?? 0
+      quantities.set(usage.itemId, fromScaledInteger(toScaledInteger(current) + toScaledInteger(usage.quantity)))
+    }
+
+    const remaining = new Map<string, number>()
+    for (const [itemId, quantity] of quantities) {
+      const item = this.snapshot.items.find((candidate) => candidate.id === itemId)
+      if (!item) throw new StoreExpenditureError('item-not-found', 'A reagent item no longer exists in inventory.')
+      const nextStock = toScaledInteger(item.currentStock) - toScaledInteger(quantity)
+      if (nextStock < 0) throw new StoreExpenditureError('insufficient-stock', `Insufficient stock for ${item.name}. Only ${item.currentStock} ${item.unit} available.`)
+      remaining.set(itemId, fromScaledInteger(nextStock))
+    }
+
+    this.commit({
+      ...this.snapshot,
+      items: this.snapshot.items.map((item) => {
+        const currentStock = remaining.get(item.id)
+        return currentStock === undefined ? item : { ...item, currentStock }
+      }),
+      deductedOrderIds: [...this.snapshot.deductedOrderIds, orderId],
+    })
+  }
+
   private assertUniqueName(name: string, exceptId?: string) {
     const normalized = name.toLocaleLowerCase()
     if (this.snapshot.items.some((item) => item.id !== exceptId && item.name.toLocaleLowerCase() === normalized)) {
@@ -245,14 +281,14 @@ export class LocalStoreExpenditureService implements StoreExpenditureService {
   private read(): StoreExpenditureData {
     try {
       const saved = this.storage.getItem(STORAGE_KEY)
-      if (!saved) return { items: [], bills: [] }
+      if (!saved) return { items: [], bills: [], deductedOrderIds: [] }
       const parsed: unknown = JSON.parse(saved)
       if (isData(parsed)) return migrateData(parsed)
       console.error('Saved store and expenditure data has an invalid shape.')
     } catch (error) {
       console.error('Unable to load store and expenditure data.', error)
     }
-    return { items: [], bills: [] }
+    return { items: [], bills: [], deductedOrderIds: [] }
   }
 
   private commit(next: StoreExpenditureData) {

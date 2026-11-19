@@ -29,7 +29,8 @@ export type Patient = {
 export type AttendanceRecord = { id: string; labTechnicianId: string; date: string; status: AttendanceStatus; updatedAt: string }
 export type PersistedPatient = Omit<Patient, 'labTechnicianId' | 'sampleCollectorId'> &
   Partial<Pick<Patient, 'labTechnicianId' | 'sampleCollectorId'>> & { doctorId?: string }
-export type TestParameter = { id: string; name: string; unit: string; reference?: string }
+export type TestParameter = { id: string; name: string; unit: string; reference?: string; groupId?: string; groupName?: string }
+export type TestReagentUsage = { itemId: string; quantity: number }
 export type LabTest = {
   id: string
   name: string
@@ -38,6 +39,7 @@ export type LabTest = {
   unit: string
   reference: string
   parameters?: TestParameter[]
+  reagents?: TestReagentUsage[]
   profiles?: TestProfile[]
 }
 export type LabOrder = {
@@ -47,6 +49,7 @@ export type LabOrder = {
   createdAt: string
   result: string
   parameterResults?: Record<string, string>
+  reagentsDeductedAt?: string
   status: OrderStatus
   printedAt?: string
 }

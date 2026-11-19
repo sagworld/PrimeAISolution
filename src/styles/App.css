@@ -177,54 +177,6 @@ button {
   margin-top: auto;
 }
 
-.support-card {
-  margin: 0 2px 17px;
-  padding: 15px 13px 13px;
-  border: 1px solid #e7eeea;
-  border-radius: 11px;
-  background: linear-gradient(140deg, #f8fcfa, #f4faf7);
-}
-
-.support-icon {
-  display: grid;
-  width: 27px;
-  height: 27px;
-  place-items: center;
-  margin-bottom: 10px;
-  border-radius: 8px;
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.support-card > strong {
-  color: #344446;
-  font-size: 12px;
-}
-
-.support-card p {
-  margin: 5px 0 11px;
-  color: #859192;
-  font-size: 10px;
-  line-height: 1.5;
-}
-
-.secure-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #748784;
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.8px;
-}
-
-.secure-label span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #46ad83;
-}
-
 .profile-button {
   display: flex;
   width: 100%;
@@ -2122,6 +2074,10 @@ kbd {
   box-shadow: 0 22px 70px rgba(29, 49, 47, 0.2);
 }
 
+.dialog.test-master-dialog {
+  width: min(100%, 900px);
+}
+
 .dialog-heading {
   display: flex;
   align-items: flex-start;
@@ -2182,7 +2138,21 @@ kbd {
   gap: 12px;
 }
 
+.test-master-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(110px, 0.55fr);
+  gap: 12px;
+}
+
+.test-master-sections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
 .test-parameter-editor {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 9px;
@@ -2203,6 +2173,44 @@ kbd {
   font-size: 10px;
 }
 
+.parameter-editor-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.parameter-draft-list {
+  height: 270px;
+  flex: 0 0 270px;
+  max-height: 270px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
+.parameter-group-draft {
+  padding-bottom: 8px;
+  border-bottom: 1px solid #edf0f0;
+}
+
+.standalone-parameter-draft {
+  padding-top: 8px;
+}
+
+.parameter-group-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.parameter-group-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
 .parameter-draft-row {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.8fr) minmax(0, 1fr) auto;
@@ -2210,6 +2218,32 @@ kbd {
   gap: 8px;
   padding-top: 9px;
   border-top: 1px solid #edf0f0;
+}
+
+.reagent-draft-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(60px, 0.6fr) minmax(75px, 0.8fr) auto;
+  align-items: end;
+  gap: 8px;
+  padding-top: 9px;
+  border-top: 1px solid #edf0f0;
+}
+
+.reagent-draft-list {
+  height: 210px;
+  flex: 0 0 210px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
+.reagent-draft-row .parameter-remove {
+  grid-column: auto;
+}
+
+.reagent-draft-row input[readonly] {
+  background: #f6f8f8;
+  cursor: not-allowed;
 }
 
 .parameter-remove {
@@ -2333,6 +2367,20 @@ kbd {
   gap: 3px;
   color: #899596;
   font-size: 8px;
+}
+
+.parameter-result-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.parameter-group-label {
+  display: block;
+  margin-bottom: 2px;
+  color: #4a7867;
+  font-size: 9px;
+  font-weight: 700;
 }
 
 .report-generator-panel {
@@ -2797,7 +2845,6 @@ kbd {
   .brand-copy,
   .workspace-label,
   .nav-item > span,
-  .support-card,
   .profile-copy,
   .profile-more {
     display: none;
@@ -3267,8 +3314,23 @@ kbd {
     gap: 8px;
   }
 
+  .test-master-fields {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .test-master-sections {
+    grid-template-columns: 1fr;
+  }
+
   .parameter-draft-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .parameter-draft-list {
+    height: 590px;
+    flex-basis: 590px;
+    max-height: 590px;
   }
 
   .parameter-draft-row label:first-child {
@@ -3349,7 +3411,6 @@ kbd {
     .result-card,
     .quick-actions button,
     .report-generator-panel,
-    .support-card,
     .attendance-login-card,
     .appearance-panel
   ) {
@@ -3361,7 +3422,7 @@ kbd {
     background: rgba(27, 38, 36, 0.96);
   }
 
-  .app-shell[data-mode='dark'] :is(.support-card, .completion-note) {
+  .app-shell[data-mode='dark'] .completion-note {
     background: #202c2a;
   }
 
@@ -3389,7 +3450,7 @@ kbd {
     color: #d7e1de;
   }
 
-  .app-shell[data-mode='dark'] :is(.page-heading p, .panel-heading p, .stat-label, .stat-card > small, .quick-actions small, .support-card p, .profile-copy small, .table-footer, .demo-notice, .attendance-security-note, .form-intro, .appearance-panel-heading small, .report-footer-note, .revenue-range-label) {
+  .app-shell[data-mode='dark'] :is(.page-heading p, .panel-heading p, .stat-label, .stat-card > small, .quick-actions small, .profile-copy small, .table-footer, .demo-notice, .attendance-security-note, .form-intro, .appearance-panel-heading small, .report-footer-note, .revenue-range-label) {
     color: #9eadaa;
   }
 

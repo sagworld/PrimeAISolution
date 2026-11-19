@@ -30,7 +30,7 @@ export function useAiInterpretation(
           tests: selectedPatientOrders.map((order) => ({
             name: getTest(store, order.testId)?.name ?? 'Unknown test',
             parameters: getTestParameters(store, order).map((parameter) => ({
-              name: parameter.name,
+              name: parameter.groupName ? `${parameter.groupName} - ${parameter.name}` : parameter.name,
               value: getParameterResult(order, parameter).trim() || 'Not entered',
               unit: parameter.unit,
               reference: parameter.reference ?? '',

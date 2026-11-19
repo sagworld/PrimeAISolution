@@ -38,6 +38,7 @@ export type ImportBill = {
 export type StoreExpenditureData = {
   items: StoreItem[]
   bills: ImportBill[]
+  deductedOrderIds: string[]
 }
 
 export type InventoryRow = StoreItem & { usedQuantity: number; totalExpenditure: number }
