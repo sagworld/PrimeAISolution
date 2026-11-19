@@ -7,6 +7,7 @@ import type {
   StoreItemCategory,
   StoreUnit,
   StockDeductionResult,
+  PaymentMethod,
 } from '@/features/store-expenditure/types'
 import { StoreExpenditureError } from '@/features/store-expenditure/types'
 import { calculateTotalCost, fromScaledInteger, getBillRemaining, normalizeItemName, toScaledInteger } from '@/features/store-expenditure/utils'
@@ -21,10 +22,12 @@ type NewImport = {
   quantity: number
   costPerUnit: number
   amountPaid: number
+  paymentMethod: PaymentMethod
   date: string
 }
 
-type StoredBill = Omit<ImportBill, 'payments'> & { payments?: BillPayment[] }
+type StoredPayment = Omit<BillPayment, 'method'> & { method?: BillPayment['method'] }
+type StoredBill = Omit<ImportBill, 'payments'> & { payments?: StoredPayment[] }
 type StoredData = { items: StoreItem[]; bills: StoredBill[]; deductedOrderIds?: string[] }
 type StockUsage = { itemId: string; quantity: number }
 
@@ -33,14 +36,19 @@ export interface StoreExpenditureService {
   subscribe: (listener: () => void) => () => void
   addItem: (draft: NewItem) => void
   updateItem: (itemId: string, update: ItemUpdate) => void
+  removeItem: (itemId: string) => void
   recordImport: (draft: NewImport) => ImportBill
-  recordPayment: (billId: string, amount: number) => void
+  recordPayment: (billId: string, amount: number, method: PaymentMethod) => void
   deductStock: (itemId: string, quantity: number) => number
   deductStockForOrder: (orderId: string, usages: StockUsage[]) => void
 }
 
 function isUnit(value: unknown): value is StoreUnit {
   return value === 'quantity' || value === 'kg' || value === 'litre'
+}
+
+function isPaymentMethod(value: unknown): value is PaymentMethod {
+  return value === 'cash' || value === 'upi'
 }
 
 function isItemCategory(value: unknown): value is StoreItemCategory {
@@ -51,11 +59,12 @@ function isNonNegativeNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0
 }
 
-function isPayment(value: unknown): value is BillPayment {
+function isPayment(value: unknown): value is StoredPayment {
   return typeof value === 'object' && value !== null &&
     'id' in value && typeof value.id === 'string' &&
     'amount' in value && isNonNegativeNumber(value.amount) &&
-    'paidAt' in value && typeof value.paidAt === 'string'
+    'paidAt' in value && typeof value.paidAt === 'string' &&
+    (!('method' in value) || isPaymentMethod(value.method) || value.method === 'unspecified')
 }
 
 function isData(value: unknown): value is StoredData {
@@ -101,7 +110,13 @@ function migrateData(data: StoredData): StoreExpenditureData {
       ...item,
       currentStock: fromScaledInteger(Math.min(toScaledInteger(item.currentStock), importedByItem.get(item.id) ?? 0)),
     })),
-    bills: data.bills.map((bill) => ({ ...bill, payments: bill.payments ?? [] })),
+    bills: data.bills.map((bill) => ({
+      ...bill,
+      payments: (bill.payments ?? []).map((payment) => ({
+        ...payment,
+        method: payment.method ?? 'unspecified',
+      })),
+    })),
     deductedOrderIds: data.deductedOrderIds ?? [],
   }
 }
@@ -165,6 +180,16 @@ export class LocalStoreExpenditureService implements StoreExpenditureService {
     })
   }
 
+  removeItem(itemId: string) {
+    if (!this.snapshot.items.some((item) => item.id === itemId)) {
+      throw new StoreExpenditureError('item-not-found', 'This item no longer exists.')
+    }
+    this.commit({
+      ...this.snapshot,
+      items: this.snapshot.items.filter((item) => item.id !== itemId),
+    })
+  }
+
   recordImport(draft: NewImport) {
     const item = this.snapshot.items.find((candidate) => candidate.id === draft.itemId)
     if (!item) throw new StoreExpenditureError('item-not-found', 'This item no longer exists.')
@@ -185,7 +210,7 @@ export class LocalStoreExpenditureService implements StoreExpenditureService {
       throw new StoreExpenditureError('invalid-input', 'Amount paid cannot exceed the bill total.')
     }
     const payments: BillPayment[] = draft.amountPaid > 0
-      ? [{ id: makeId('payment'), amount: fromScaledInteger(toScaledInteger(draft.amountPaid)), paidAt: new Date().toISOString() }]
+      ? [{ id: makeId('payment'), amount: fromScaledInteger(toScaledInteger(draft.amountPaid)), paidAt: new Date().toISOString(), method: draft.paymentMethod }]
       : []
     const bill: ImportBill = {
       id: makeId('bill'),
@@ -209,9 +234,10 @@ export class LocalStoreExpenditureService implements StoreExpenditureService {
     return bill
   }
 
-  recordPayment(billId: string, amount: number) {
+  recordPayment(billId: string, amount: number, method: PaymentMethod) {
     validateNonNegative(amount, 'Payment')
     if (amount <= 0) throw new StoreExpenditureError('invalid-input', 'Payment must be greater than 0.')
+    if (!isPaymentMethod(method)) throw new StoreExpenditureError('invalid-input', 'Choose Cash or UPI as the payment method.')
     const bill = this.snapshot.bills.find((candidate) => candidate.id === billId)
     if (!bill) throw new StoreExpenditureError('bill-not-found', 'This bill no longer exists.')
     const remaining = getBillRemaining(bill)
@@ -221,7 +247,7 @@ export class LocalStoreExpenditureService implements StoreExpenditureService {
     this.commit({
       ...this.snapshot,
       bills: this.snapshot.bills.map((candidate) => candidate.id === billId
-        ? { ...candidate, payments: [...candidate.payments, { id: makeId('payment'), amount, paidAt: new Date().toISOString() }] }
+        ? { ...candidate, payments: [...candidate.payments, { id: makeId('payment'), amount, paidAt: new Date().toISOString(), method }] }
         : candidate),
     })
   }

@@ -16,7 +16,10 @@ export type BillPayment = {
   id: string
   amount: number
   paidAt: string
+  method: PaymentMethod | 'unspecified'
 }
+
+export type PaymentMethod = 'cash' | 'upi'
 
 export type BillPaymentStatus = 'paid' | 'partially paid' | 'unpaid'
 export type BillStatusFilter = 'all' | BillPaymentStatus

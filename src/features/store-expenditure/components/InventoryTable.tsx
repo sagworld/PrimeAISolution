@@ -15,6 +15,7 @@ export function InventoryTable({
   onAdd,
   onImport,
   onEdit,
+  onRemove,
 }: {
   items: InventoryRow[]
   totalExpenditure: number
@@ -26,6 +27,7 @@ export function InventoryTable({
   onAdd: () => void
   onImport: (item: InventoryRow) => void
   onEdit: (item: InventoryRow) => void
+  onRemove: (item: InventoryRow) => void
 }) {
   return (
     <div className="panel store-panel">
@@ -48,7 +50,7 @@ export function InventoryTable({
                 <td>{item.usedQuantity.toLocaleString(locale, { maximumFractionDigits: 2 })}</td>
                 <td>{item.currentStock.toLocaleString(locale, { maximumFractionDigits: 2 })}</td>
                 <td>{formatStoreCurrency(item.totalExpenditure, locale)}</td><td><StockStatusBadge low={isLow} /></td>
-                <td><div className="store-row-actions"><button type="button" className="button button-small button-outline" onClick={() => onImport(item)}>Import</button><button type="button" className="button button-small button-outline" aria-label={`Edit ${item.name}`} onClick={() => onEdit(item)}>Edit</button></div></td>
+                <td><div className="store-row-actions"><button type="button" className="button button-small button-outline" onClick={() => onImport(item)}>Import</button><button type="button" className="button button-small button-outline" aria-label={`Edit ${item.name}`} onClick={() => onEdit(item)}>Edit</button><button type="button" className="button button-small button-outline store-remove-button" aria-label={`Remove ${item.name}`} onClick={() => onRemove(item)}>Remove</button></div></td>
               </tr>
             })}
             {!items.length && <tr><td className="empty-cell" colSpan={8}>No inventory items match these filters.</td></tr>}

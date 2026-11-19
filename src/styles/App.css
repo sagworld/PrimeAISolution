@@ -3491,8 +3491,31 @@ kbd {
   }
 }
 
+.store-expenditure-main {
+  display: flex;
+  height: 100vh;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.store-expenditure-main .page-content {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
 .store-expenditure-page {
+  display: flex;
   min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .store-view-toggle {
@@ -3523,6 +3546,13 @@ kbd {
 }
 
 .store-panel {
+  display: flex;
+  min-height: 0;
+  width: 100%;
+  max-height: 100%;
+  flex: 0 1 auto;
+  flex-direction: column;
+  box-sizing: border-box;
   overflow: hidden;
 }
 
@@ -3547,7 +3577,11 @@ kbd {
 }
 
 .store-table-scroll {
-  max-height: min(60vh, 680px);
+  min-height: 0;
+  width: 100%;
+  max-height: 100%;
+  flex: 0 1 auto;
+  box-sizing: border-box;
   overflow: auto;
   border-top: 1px solid #edf0f0;
   scrollbar-gutter: stable;
@@ -3562,8 +3596,16 @@ kbd {
   text-align: left;
 }
 
+.store-inventory-table {
+  min-width: 1180px;
+}
+
 .store-bills-table {
   min-width: 1180px;
+}
+
+.store-remove-button {
+  color: #a63f3f;
 }
 
 .store-table th {
@@ -3748,6 +3790,120 @@ kbd {
   font-size: 14px;
 }
 
+.store-bill-dialog {
+  width: min(100%, 720px);
+}
+
+.store-bill-heading,
+.store-bill-totals > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.store-bill-heading {
+  margin-bottom: 18px;
+}
+
+.store-bill-heading h3,
+.store-printable-bill h4 {
+  margin: 0;
+  color: #344546;
+}
+
+.store-bill-heading h3 {
+  font-size: 18px;
+}
+
+.store-bill-heading p {
+  margin: 5px 0 0;
+  color: #899596;
+  font-size: 10px;
+}
+
+.store-bill-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 20px;
+  padding: 14px;
+  border: 1px solid #e9eeee;
+  border-radius: 8px;
+  background: #f9fbfa;
+}
+
+.store-bill-summary dt,
+.store-bill-totals dt {
+  color: #7d8a8b;
+  font-size: 10px;
+}
+
+.store-bill-summary dd,
+.store-bill-totals dd {
+  margin: 4px 0 0;
+  color: #3f4e4f;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.store-printable-bill h4 {
+  margin-bottom: 9px;
+  font-size: 12px;
+}
+
+.store-bill-history {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.store-bill-history th,
+.store-bill-history td {
+  padding: 9px 8px;
+  border-bottom: 1px solid #edf0f0;
+  color: #596869;
+  font-size: 10px;
+  text-align: left;
+}
+
+.store-bill-history th {
+  background: #f6f9f8;
+  color: #788687;
+  font-size: 9px;
+}
+
+.store-bill-history td:last-child,
+.store-bill-history th:last-child {
+  text-align: right;
+}
+
+.store-no-payments {
+  margin: 0;
+  padding: 12px;
+  border-radius: 6px;
+  background: #f8f9f9;
+  color: #7d8a8b;
+  font-size: 10px;
+}
+
+.store-bill-totals {
+  display: grid;
+  gap: 8px;
+  max-width: 280px;
+  margin: 16px 0 0 auto;
+  padding-top: 12px;
+  border-top: 1px solid #e9eeee;
+}
+
+.store-bill-totals > div {
+  align-items: baseline;
+}
+
+.store-bill-totals dd {
+  margin: 0;
+  text-align: right;
+}
+
 .store-form-error {
   margin: 0;
   color: #a33a32;
@@ -3828,6 +3984,12 @@ kbd {
 }
 
 @media (max-width: 640px) {
+  .store-expenditure-main .page-content {
+    padding-right: 12px;
+    padding-bottom: calc(86px + env(safe-area-inset-bottom));
+    padding-left: 12px;
+  }
+
   .side-nav {
     max-height: none;
   }
@@ -3885,6 +4047,33 @@ kbd {
     padding: 0;
     border: 0;
     box-shadow: none;
+  }
+
+  .dialog.store-bill-dialog {
+    display: block;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .app-shell:has(.store-bill-dialog) {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .app-shell:has(.store-bill-dialog) > .main-panel {
+    display: none !important;
+  }
+
+  .store-bill-print-actions {
+    display: none !important;
+  }
+
+  .store-bill-summary {
+    background: #fff;
   }
 
   .ai-controls {
