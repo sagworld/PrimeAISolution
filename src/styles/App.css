@@ -5718,6 +5718,37 @@ kbd {
   margin: 25px 0 19px;
 }
 
+.role-login-form {
+  display: grid;
+  gap: 15px;
+  margin: 24px 0 18px;
+}
+
+.role-login-form label {
+  display: grid;
+  gap: 7px;
+  color: #526365;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.role-login-form input {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid #dfe6e7;
+  border-radius: 8px;
+  background: #fff;
+  color: #263638;
+  font: inherit;
+}
+
+.role-login-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 13px;
+}
+
 .role-login-collector-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -5872,6 +5903,20 @@ kbd {
 .app-shell[data-mode='dark'] .role-login-collector-form {
   border-color: #34413f;
   background: #15201e;
+}
+
+.app-shell[data-mode='dark'] .role-login-form label {
+  color: #c0cbc8;
+}
+
+.app-shell[data-mode='dark'] .role-login-form input {
+  border-color: #3a4946;
+  background: #15201e;
+  color: #d7e1de;
+}
+
+.app-shell[data-mode='dark'] .role-login-error {
+  color: #ffb4ab;
 }
 
 .app-shell[data-mode='dark'] .role-login-collector-form label,

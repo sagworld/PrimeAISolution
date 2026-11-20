@@ -29,6 +29,7 @@ export function getInventoryRows(data: StoreExpenditureData): InventoryRow[] {
   const expenditureByItem = new Map<string, number>()
   const importedQuantityByItem = new Map<string, number>()
   for (const bill of data.bills) {
+    if (!bill.itemId) continue
     expenditureByItem.set(
       bill.itemId,
       (expenditureByItem.get(bill.itemId) ?? 0) + toScaledInteger(bill.totalCost),

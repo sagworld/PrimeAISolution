@@ -6,6 +6,11 @@
   "scripts": {
     "dev": "vite",
     "ai:server": "node server/ai-server.js",
+    "worker:dev": "wrangler dev",
+    "worker:typecheck": "tsc --noEmit -p tsconfig.worker.json",
+    "worker:deploy": "wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply prime-ai-lab --local",
+    "db:migrate:remote": "wrangler d1 migrations apply prime-ai-lab --remote",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -17,6 +22,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261120.1",
     "@eslint/js": "^9.9.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
@@ -27,6 +33,7 @@
     "globals": "^15.9.0",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^5.4.1"
+    "vite": "^5.4.1",
+    "wrangler": "^4.165.0"
   }
 }

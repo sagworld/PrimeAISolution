@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "prime-ai-lab-api",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-11-20",
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "diagnova.primesolutions.app",
+      "custom_domain": true
+    }
+  ],
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "prime-ai-lab",
+      "database_id": "b47f805c-718e-45f5-a059-028c6b9bb2c5",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "ASSETS",
+      "bucket_name": "prime-ai-lab-private-assets"
+    }
+  ]
+}

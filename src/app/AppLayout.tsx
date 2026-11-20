@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppContext } from '@/context/useAppContext'
 import { dateLocale } from '@/i18n'
 import { Icon } from '@/shared/components'
-import { RoleLoginPage, type WorkspaceRole } from '@/app/RoleLoginPage'
+import { RoleLoginPage } from '@/app/RoleLoginPage'
 import type { Patient } from '@/shared/types'
 import {
   AttendancePage,
@@ -22,12 +22,31 @@ import { accentThemes } from '@/shared/data/initialStore'
 import '../styles/App.css'
 
 export function AppLayout() {
-  const [workspaceRole, setWorkspaceRole] = useState<WorkspaceRole | null>(null)
-  const [currentCollectorId, setCurrentCollectorId] = useState('')
   const [editingPatientId, setEditingPatientId] = useState<string | null>(null)
-  const { store, uiLanguage, appearance, section, setSection, administrationTab, setAdministrationTab, headAuthenticated, logoutHead, attendanceStartDate, setAttendanceStartDate, attendanceEndDate, setAttendanceEndDate, search, setSearch, setPatientDraft, setPatientDialog, toast, t, updateAppearance, changeUiLanguage, openAdministration, pendingCount } = useAppContext()
-  const currentCollector = store.sampleCollectors.find((collector) => collector.id === currentCollectorId)
-  const currentCollectorName = currentCollector?.name ?? t('sample collector')
+  const {
+    authenticatedUser, authLoading, authError, dataLoading, dataError, refreshLabData, login, logout, isOwner,
+    store, uiLanguage, appearance, section, setSection, administrationTab, setAdministrationTab,
+    attendanceStartDate, setAttendanceStartDate, attendanceEndDate, setAttendanceEndDate,
+    search, setSearch, setPatientDraft, setPatientDialog, toast, t, updateAppearance,
+    changeUiLanguage, openAdministration, pendingCount,
+  } = useAppContext()
+  const workspaceRole = authenticatedUser?.role === 'sample-collector' ? 'sample-collector' : 'lab-technician'
+  const currentCollectorId = authenticatedUser?.sampleCollectorId ?? ''
+  const authenticatedUserId = authenticatedUser?.id
+  const authenticatedRole = authenticatedUser?.role
+  const accountRole = authenticatedUser?.role === 'owner'
+    ? t('Owner')
+    : authenticatedUser?.role === 'lab-technician'
+      ? t('lab technician')
+      : t('sample collector')
+
+  useEffect(() => {
+    if (!authenticatedUserId || !authenticatedRole) return
+    setSearch('')
+    setSection(authenticatedRole === 'sample-collector' ? 'patients' : 'overview')
+    setAdministrationTab('attendance')
+    setEditingPatientId(null)
+  }, [authenticatedRole, authenticatedUserId, setAdministrationTab, setSearch, setSection])
   const editPatient = (patient: Patient) => {
     setEditingPatientId(patient.id)
     setPatientDraft({
@@ -41,20 +60,33 @@ export function AppLayout() {
     })
     setPatientDialog(true)
   }
-  if (!workspaceRole) {
+  if (authLoading) {
+    return <div className="app-shell role-login-shell" data-mode={appearance.mode} data-accent={appearance.accent}>
+      <main className="role-login-page"><p role="status">{t('Checking your session...')}</p></main>
+    </div>
+  }
+  if (!authenticatedUser) {
     return <RoleLoginPage
       mode={appearance.mode}
       accent={appearance.accent}
-      sampleCollectors={store.sampleCollectors}
       t={t}
-      onLogin={(role, collectorId) => {
-        setWorkspaceRole(role)
-        setCurrentCollectorId(role === 'sample-collector' ? collectorId ?? '' : '')
-        setEditingPatientId(null)
-        setSearch('')
-        setSection(role === 'lab-technician' ? 'overview' : 'patients')
-      }}
+      loading={authLoading}
+      error={authError}
+      onLogin={login}
     />
+  }
+  if (dataLoading || dataError) {
+    return <div className="app-shell role-login-shell" data-mode={appearance.mode} data-accent={appearance.accent}>
+      <main className="role-login-page">
+        {dataLoading
+          ? <p role="status">{t('Loading lab data...')}</p>
+          : <div className="role-login-error" role="alert">
+            <p>{t(dataError)}</p>
+            <button type="button" className="button button-primary" onClick={() => { void refreshLabData() }}>{t('Retry')}</button>
+            <button type="button" className="button button-outline" onClick={() => { void logout() }}>{t('Sign out')}</button>
+          </div>}
+      </main>
+    </div>
   }
 
   return (
@@ -71,21 +103,21 @@ export function AppLayout() {
             <div className="nav-separator" />
             <button className={`nav-item ${section === 'masters' ? 'active' : ''}`} onClick={() => setSection('masters')}><Icon name="masters" /><span>{t('Masters')}</span></button>
             <button className={`nav-item ${section === 'patients' ? 'active' : ''}`} onClick={() => setSection('patients')}><Icon name="patients" /><span>{t('Patients')}</span><span className="nav-count">{store.patients.length}</span></button>
-            <button className={`nav-item ${section === 'administration' ? 'active' : ''}`} onClick={openAdministration}><Icon name="masters" /><span>{t('Administration')}</span></button>
+            {isOwner && <button className={`nav-item ${section === 'administration' ? 'active' : ''}`} onClick={openAdministration}><Icon name="masters" /><span>{t('Administration')}</span></button>}
             <button className={`nav-item ${section === 'results' ? 'active' : ''}`} onClick={() => setSection('results')}><Icon name="flask" /><span>{t('Test results')}</span>{pendingCount > 0 && <span className="nav-count warning">{pendingCount}</span>}</button>
             <button className={`nav-item ${section === 'report-generation' ? 'active' : ''}`} onClick={() => setSection('report-generation')}><Icon name="print" /><span>{t('Report generation')}</span></button>
             <button className={`nav-item ${section === 'reports' ? 'active' : ''}`} onClick={() => setSection('reports')}><Icon name="report" /><span>{t('Reports')}</span></button>
             <button className={`nav-item ${section === 'billing' ? 'active' : ''}`} onClick={() => setSection('billing')}><Icon name="report" /><span>{t('Billing')}</span></button>
             <button className={`nav-item ${section === 'store-expenditure' ? 'active' : ''}`} onClick={() => setSection('store-expenditure')}><Icon name="masters" /><span>{t('Store & Expenditure')}</span></button>
-            <button className={`nav-item ${section === 'lab-settings' ? 'active' : ''}`} onClick={() => setSection('lab-settings')}><Icon name="masters" /><span>{t('Lab settings')}</span></button>
+            {isOwner && <button className={`nav-item ${section === 'lab-settings' ? 'active' : ''}`} onClick={() => setSection('lab-settings')}><Icon name="masters" /><span>{t('Lab settings')}</span></button>}
           </> : (
             <button className={`nav-item ${section === 'patients' ? 'active' : ''}`} onClick={() => setSection('patients')}><Icon name="patients" /><span>{t('Patients')}</span><span className="nav-count">{store.patients.length}</span></button>
           )}
         </nav>
         <div className="sidebar-bottom">
           <button className="profile-button">
-            <span className="avatar">{workspaceRole === 'lab-technician' ? 'LT' : 'SC'}</span>
-            <span className="profile-copy"><strong>{workspaceRole === 'lab-technician' ? t('lab technician') : currentCollectorName}</strong><small>{t('Demo login')}</small></span>
+            <span className="avatar">{authenticatedUser.role === 'owner' ? 'OW' : workspaceRole === 'lab-technician' ? 'LT' : 'SC'}</span>
+            <span className="profile-copy"><strong>{authenticatedUser.username}</strong><small>{accountRole}</small></span>
           </button>
         </div>
       </aside>
@@ -112,14 +144,15 @@ export function AppLayout() {
               <span className="today-date">{new Intl.DateTimeFormat(dateLocale(uiLanguage), { weekday: 'short', day: 'numeric', month: 'short' }).format(new Date())}</span>
             </>}
             <div className="role-session-control">
-              <span>{workspaceRole === 'lab-technician' ? t('lab technician') : currentCollectorName}</span>
-              <button type="button" className="button button-small button-outline" onClick={() => { setWorkspaceRole(null); setCurrentCollectorId(''); setEditingPatientId(null) }}>{t('Switch user')}</button>
+              <span>{authenticatedUser.username}</span>
+              <button type="button" className="button button-small button-outline" disabled={authLoading} onClick={() => { void logout() }}>{t('Sign out')}</button>
             </div>
           </div>
         </header>
 
         <div className="page-content">
-          {section === 'administration' && headAuthenticated && (
+          {authError && <p className="role-login-error" role="alert">{t(authError)}</p>}
+          {section === 'administration' && isOwner && (
             <section className="page-section">
               <div className="administration-header">
                 <div className="tab-bar administration-tabs" role="tablist" aria-label={t('Administration modules')}>
@@ -142,7 +175,6 @@ export function AppLayout() {
                     <label className="attendance-date-picker"><span>{t('To date')}</span><input type="date" min={attendanceStartDate} value={attendanceEndDate} onChange={(event) => { if (event.target.value) setAttendanceEndDate(event.target.value) }} /></label>
                   </div>
                 )}
-                <button type="button" className="button button-outline administration-logout" onClick={logoutHead}>{t('Log out')}</button>
               </div>
             </section>
           )}

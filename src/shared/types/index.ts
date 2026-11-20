@@ -16,8 +16,9 @@ export type LabProfile = {
   address: string
   ownerName: string
   mobile: string
-  logoDataUrl: string
-  signatureDataUrl: string
+  logoUrl: string
+  signatureUrl: string
+  paymentQrUrl: string
 }
 export type RevenueSummaryRow = { id: string; name: string; orders: number; amount: number }
 export type LabTechnician = { id: string; name: string; specialty: string; phone: string }
@@ -44,7 +45,7 @@ export type LabTest = {
   id: string
   name: string
   category: string
-  price: number
+  price?: number
   unit: string
   reference: string
   parameters?: TestParameter[]

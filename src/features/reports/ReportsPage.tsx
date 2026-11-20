@@ -34,7 +34,7 @@ export function ReportsPage() {
                   <div className="analysis-foot"><span>{t('Based on')} {store.orders.length} {t('orders')}</span><span><Icon name="trend" size={13} /> {t('Live')}</span></div>
                 </article>
               </div>
-              <p className="demo-notice">{t('Reports and analytics are based on the records currently saved in this browser.')}</p>
+              <p className="demo-notice">{t('Reports and analytics are based on records stored in the lab database.')}</p>
             </section>
           )}
     </>

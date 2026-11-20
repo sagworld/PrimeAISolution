@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { LabAppState } from '@/hooks/useLabState'
 import type { AppCoreActions } from '@/hooks/useAppCore'
 import { normalizeIndianMobileNumber } from '@/shared/utils/appUtils'
+import { markOrdersPrinted } from '@/services/labService'
 
 type PreparedPatientReportPdf = {
   pdfBlob: Blob
@@ -18,9 +19,9 @@ function preparePatientReportFile(pdfBlob: Blob, filename: string): PreparedPati
   }
 }
 
-export function usePatientReport(state: LabAppState, { persist, notify }: AppCoreActions) {
+export function usePatientReport(state: LabAppState, { notify }: AppCoreActions) {
   const {
-    store, labProfile, uiLanguage, reportHeaderEnabled, aiInterpretation, aiLoading, aiError, reportPatientId, reportOrderIds, reportRef, setSharingReport,
+    store, setStore, labProfile, uiLanguage, reportHeaderEnabled, aiInterpretation, aiLoading, aiError, reportPatientId, reportOrderIds, reportRef, setSharingReport,
     setReportOrderIds, setReportPatientId, setAiInterpretation, setAiError, t,
   } = state
   const selectedReportPatient = reportPatientId
@@ -62,10 +63,13 @@ export function usePatientReport(state: LabAppState, { persist, notify }: AppCor
     const printedOrderIds = new Set(selectedPatientOrders.map((order) => order.id))
     window.print()
     if (!window.confirm(t('Was this report printed successfully?'))) return
-    const printedAt = new Date().toISOString()
-    persist({
-      ...store,
-      orders: store.orders.map((order) => printedOrderIds.has(order.id) ? { ...order, printedAt } : order),
+    void markOrdersPrinted([...printedOrderIds]).then((printedAt) => {
+      setStore((current) => ({
+        ...current,
+        orders: current.orders.map((order) => printedOrderIds.has(order.id) ? { ...order, printedAt } : order),
+      }))
+    }).catch((reason: unknown) => {
+      notify(reason instanceof Error ? reason.message : 'Unable to save the printed report status.')
     })
   }
 

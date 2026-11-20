@@ -11,7 +11,19 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': 'http://127.0.0.1:3001',
+      '/api/auth': 'http://127.0.0.1:8787',
+      '/api/patients': 'http://127.0.0.1:8787',
+      '/api/tests': 'http://127.0.0.1:8787',
+      '/api/orders': 'http://127.0.0.1:8787',
+      '/api/masters': 'http://127.0.0.1:8787',
+      '/api/attendance': 'http://127.0.0.1:8787',
+      '/api/invoices': 'http://127.0.0.1:8787',
+      '/api/inventory': 'http://127.0.0.1:8787',
+      '/api/import-bills': 'http://127.0.0.1:8787',
+      '/api/reports': 'http://127.0.0.1:8787',
+      '/api/revenue': 'http://127.0.0.1:8787',
+      '/api/health': 'http://127.0.0.1:3001',
+      '/api/interpret': 'http://127.0.0.1:3001',
     },
   },
 })

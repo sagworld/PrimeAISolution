@@ -1,7 +1,7 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { useAppContext } from '@/context/useAppContext'
 import { Icon } from '@/shared/components/Icon'
-import { saveLabProfile } from '@/services/browserStorage'
+import { deleteLabAsset, saveLabSettings, uploadLabAsset } from '@/services/labSettingsService'
 import type { LabProfile } from '@/shared/types'
 
 const maxImageSize = 512 * 1024
@@ -21,11 +21,20 @@ function readImageFile(file: File): Promise<string> {
 export function LabSettingsPage() {
   const { labProfile, setLabProfile, notify, t } = useAppContext()
   const [draft, setDraft] = useState<LabProfile>(labProfile)
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [signatureFile, setSignatureFile] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+  const [signaturePreview, setSignaturePreview] = useState<string | null>(null)
+  const [removeLogo, setRemoveLogo] = useState(false)
+  const [removeSignature, setRemoveSignature] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
+  const logoImage = logoPreview ?? (removeLogo ? '' : draft.logoUrl)
+  const signatureImage = signaturePreview ?? (removeSignature ? '' : draft.signatureUrl)
 
   const updateImage = async (
     event: ChangeEvent<HTMLInputElement>,
-    field: 'logoDataUrl' | 'signatureDataUrl',
+    field: 'logoUrl' | 'signatureUrl',
   ) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -36,22 +45,59 @@ export function LabSettingsPage() {
     }
     try {
       const dataUrl = await readImageFile(file)
-      setDraft((current) => ({ ...current, [field]: dataUrl }))
+      if (field === 'logoUrl') {
+        setLogoFile(file)
+        setLogoPreview(dataUrl)
+        setRemoveLogo(false)
+      } else {
+        setSignatureFile(file)
+        setSignaturePreview(dataUrl)
+        setRemoveSignature(false)
+      }
       setError('')
     } catch (caught) {
       setError(caught instanceof Error ? t(caught.message) : t('Could not read the selected image.'))
     }
   }
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError('')
+    setIsSaving(true)
     try {
-      saveLabProfile(draft)
-      setLabProfile({ ...draft, name: draft.name.trim(), address: draft.address.trim(), ownerName: draft.ownerName.trim(), mobile: draft.mobile.trim() })
+      let updated = await saveLabSettings({
+        name: draft.name,
+        address: draft.address,
+        ownerName: draft.ownerName,
+        mobile: draft.mobile,
+      })
+      setLabProfile(updated)
+      if (removeLogo) {
+        updated = await deleteLabAsset('logo')
+        setLabProfile(updated)
+      } else if (logoFile) {
+        updated = await uploadLabAsset('logo', logoFile)
+        setLabProfile(updated)
+      }
+      if (removeSignature) {
+        updated = await deleteLabAsset('signature')
+        setLabProfile(updated)
+      } else if (signatureFile) {
+        updated = await uploadLabAsset('signature', signatureFile)
+        setLabProfile(updated)
+      }
+      setDraft(updated)
+      setLogoFile(null)
+      setSignatureFile(null)
+      setLogoPreview(null)
+      setSignaturePreview(null)
+      setRemoveLogo(false)
+      setRemoveSignature(false)
       notify('Lab settings saved.')
     } catch (caught) {
-      setError(caught instanceof Error ? t(caught.message) : t('Could not save lab settings in this browser.'))
+      setError(caught instanceof Error ? t(caught.message) : t('Could not save lab settings.'))
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -70,17 +116,17 @@ export function LabSettingsPage() {
         <div className="lab-settings-assets">
           <div className="lab-settings-asset">
             <div><strong>{t('Lab logo')}</strong><p>{t('PNG or JPG, up to 512 KB.')}</p></div>
-            <label className="button button-outline lab-image-upload"><Icon name="download" size={15} />{t(draft.logoDataUrl ? 'Change logo' : 'Upload logo')}<input type="file" accept="image/png,image/jpeg" onChange={(event) => { void updateImage(event, 'logoDataUrl') }} /></label>
-            {draft.logoDataUrl && <div className="lab-image-preview"><img src={draft.logoDataUrl} alt={t('Lab logo preview')} /><button type="button" className="button button-small button-outline" onClick={() => setDraft({ ...draft, logoDataUrl: '' })}>{t('Remove')}</button></div>}
+            <label className="button button-outline lab-image-upload"><Icon name="download" size={15} />{t(logoImage ? 'Change logo' : 'Upload logo')}<input type="file" accept="image/png,image/jpeg" disabled={isSaving} onChange={(event) => { void updateImage(event, 'logoUrl') }} /></label>
+            {logoImage && <div className="lab-image-preview"><img src={logoImage} alt={t('Lab logo preview')} /><button type="button" className="button button-small button-outline" disabled={isSaving} onClick={() => { setLogoFile(null); setLogoPreview(''); setRemoveLogo(true) }}>{t('Remove')}</button></div>}
           </div>
           <div className="lab-settings-asset">
             <div><strong>{t('Owner digital signature')}</strong><p>{t('PNG or JPG, up to 512 KB.')}</p></div>
-            <label className="button button-outline lab-image-upload"><Icon name="download" size={15} />{t(draft.signatureDataUrl ? 'Change signature' : 'Upload signature')}<input type="file" accept="image/png,image/jpeg" onChange={(event) => { void updateImage(event, 'signatureDataUrl') }} /></label>
-            {draft.signatureDataUrl && <div className="lab-signature-preview"><img src={draft.signatureDataUrl} alt={t('Owner signature preview')} /><button type="button" className="button button-small button-outline" onClick={() => setDraft({ ...draft, signatureDataUrl: '' })}>{t('Remove')}</button></div>}
+            <label className="button button-outline lab-image-upload"><Icon name="download" size={15} />{t(signatureImage ? 'Change signature' : 'Upload signature')}<input type="file" accept="image/png,image/jpeg" disabled={isSaving} onChange={(event) => { void updateImage(event, 'signatureUrl') }} /></label>
+            {signatureImage && <div className="lab-signature-preview"><img src={signatureImage} alt={t('Owner signature preview')} /><button type="button" className="button button-small button-outline" disabled={isSaving} onClick={() => { setSignatureFile(null); setSignaturePreview(''); setRemoveSignature(true) }}>{t('Remove')}</button></div>}
           </div>
         </div>
         {error && <p className="lab-settings-error" role="alert">{error}</p>}
-        <div className="lab-settings-actions"><button type="submit" className="button button-primary"><Icon name="check" size={15} />{t('Save lab settings')}</button></div>
+        <div className="lab-settings-actions"><button type="submit" className="button button-primary" disabled={isSaving}><Icon name="check" size={15} />{isSaving ? t('Saving…') : t('Save lab settings')}</button></div>
       </form>
     </section>
   )

@@ -1,23 +1,23 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Icon } from '@/shared/components'
-import type { SampleCollector } from '@/shared/types'
-
-export type WorkspaceRole = 'lab-technician' | 'sample-collector'
 
 type RoleLoginPageProps = {
   mode: 'light' | 'dark'
   accent: string
-  sampleCollectors: SampleCollector[]
   t: (text: string) => string
-  onLogin: (role: WorkspaceRole, collectorId?: string) => void
+  loading: boolean
+  error: string
+  onLogin: (username: string, password: string) => void
 }
 
-export function RoleLoginPage({ mode, accent, sampleCollectors, t, onLogin }: RoleLoginPageProps) {
-  const [collectorLoginOpen, setCollectorLoginOpen] = useState(false)
-  const [collectorId, setCollectorId] = useState(sampleCollectors[0]?.id ?? '')
-  const selectedCollectorId = sampleCollectors.some((collector) => collector.id === collectorId)
-    ? collectorId
-    : sampleCollectors[0]?.id ?? ''
+export function RoleLoginPage({ mode, accent, t, loading, error, onLogin }: RoleLoginPageProps) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    onLogin(username, password)
+  }
 
   return (
     <div className="app-shell role-login-shell" data-mode={mode} data-accent={accent}>
@@ -27,34 +27,34 @@ export function RoleLoginPage({ mode, accent, sampleCollectors, t, onLogin }: Ro
             <span className="brand-mark"><Icon name="flask" size={21} /></span>
             <span className="brand-copy"><strong>prime<span>ai</span></strong><small>{t('LAB MANAGEMENT')}</small></span>
           </div>
-          <span className="eyebrow">{t('Demo login')}</span>
-          <h1>{t('Choose your role')}</h1>
-          <p className="role-login-intro">{t('Select a role to preview the appropriate workspace.')}</p>
-          <div className="role-login-options">
-            <button type="button" className="role-login-option" onClick={() => onLogin('lab-technician')}>
-              <span className="role-login-icon"><Icon name="flask" size={20} /></span>
-              <span><strong>{t('lab technician')}</strong><small>{t('Full access to lab management tools.')}</small></span>
-              <span className="role-login-arrow" aria-hidden="true">→</span>
+          <span className="eyebrow">{t('SECURE SIGN IN')}</span>
+          <h1>{t('Sign in to your account')}</h1>
+          <p className="role-login-intro">{t('Use the username and password provided by your lab owner.')}</p>
+          <form className="role-login-form" onSubmit={submit}>
+            <label>{t('Username')}
+              <input
+                autoComplete="username"
+                required
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+              />
+            </label>
+            <label>{t('Password')}
+              <input
+                autoComplete="current-password"
+                minLength={12}
+                required
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </label>
+            {error && <p className="role-login-error" role="alert">{t(error)}</p>}
+            <button type="submit" className="button button-primary" disabled={loading}>
+              {loading ? t('Signing in...') : t('Sign in')}
             </button>
-            <button type="button" className="role-login-option" aria-expanded={collectorLoginOpen} onClick={() => setCollectorLoginOpen((open) => !open)}>
-              <span className="role-login-icon"><Icon name="patients" size={20} /></span>
-              <span><strong>{t('sample collector')}</strong><small>{t('Register patients and add test orders only.')}</small></span>
-              <span className="role-login-arrow" aria-hidden="true">{collectorLoginOpen ? '−' : '+'}</span>
-            </button>
-            {collectorLoginOpen && (
-              <div className="role-login-collector-form">
-                {sampleCollectors.length ? <>
-                  <label>{t('Select sample collector')}
-                    <select value={selectedCollectorId} onChange={(event) => setCollectorId(event.target.value)}>
-                      {sampleCollectors.map((collector) => <option key={collector.id} value={collector.id}>{collector.name}</option>)}
-                    </select>
-                  </label>
-                  <button type="button" className="button button-primary" disabled={!selectedCollectorId} onClick={() => onLogin('sample-collector', selectedCollectorId)}>{t('Log in')}</button>
-                </> : <p>{t('No sample collectors are available. Add one using a Technician login first.')}</p>}
-              </div>
-            )}
-          </div>
-          <p className="role-login-notice">{t('Demo login only: it is not secure authentication and does not protect browser data.')}</p>
+          </form>
+          <p className="role-login-notice">{t('No public signup is available. Contact your lab owner if you need an account.')}</p>
         </section>
       </main>
     </div>

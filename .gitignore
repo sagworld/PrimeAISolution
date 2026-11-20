@@ -12,6 +12,8 @@ dist
 dist-ssr
 *.tsbuildinfo
 *.local
+.wrangler
+.dev.vars
 .env
 .env.*
 !.env.example

@@ -1,5 +1,4 @@
 export { StoreExpenditurePage } from '@/features/store-expenditure/components/StoreExpenditurePage'
-export { deductStock } from '@/features/store-expenditure/services/storeExpenditureService'
 export type {
   BillPayment,
   BillPaymentStatus,
@@ -7,9 +6,7 @@ export type {
   ImportBill,
   InventoryRow,
   PaymentMethod,
-  StockDeductionResult,
   StoreExpenditureData,
-  StoreExpenditureErrorCode,
   StoreItem,
   StoreItemCategory,
   StoreUnit,

@@ -1,9 +1,12 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useAppContext } from '@/context/useAppContext'
 import { dateLocale } from '@/i18n'
-import { dateInputValue, makeId } from '@/shared/utils/appUtils'
-import { isPaymentMethod, isPaymentStatus, readBillingData, saveBillingData } from '@/features/billing/billingStorage'
+import { dateInputValue } from '@/shared/utils/appUtils'
+import { isPaymentMethod, isPaymentStatus } from '@/features/billing/billingValidation'
+import { createInvoice as createInvoiceRequest, listInvoices, updateInvoicePayment } from '@/features/billing/billingService'
+import { uploadLabAsset } from '@/services/labSettingsService'
 import type { BillingData, BillingInvoice, BillingPaymentMethod, BillingPaymentStatus } from '@/features/billing/types'
+import type { LabTest } from '@/shared/types'
 
 type BillingDetailView = 'period' | 'month' | 'all'
 type InvoiceGroup = { key: string; invoices: BillingInvoice[]; total: number }
@@ -44,10 +47,14 @@ function escapeXml(value: string) {
 }
 
 export function BillingPage() {
-  const { store, section, uiLanguage } = useAppContext()
-  const [billingData, setBillingData] = useState<BillingData>(readBillingData)
-  const [paymentQrDraft, setPaymentQrDraft] = useState(() => readBillingData().paymentQr)
+  const { store, section, uiLanguage, labProfile, setLabProfile, isOwner } = useAppContext()
+  const [billingData, setBillingData] = useState<BillingData>({ invoices: [] })
+  const [paymentQrDraft, setPaymentQrDraft] = useState('')
+  const [paymentQrFile, setPaymentQrFile] = useState<File | null>(null)
   const [qrSaving, setQrSaving] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [billingLoaded, setBillingLoaded] = useState(false)
+  const [invoiceSaving, setInvoiceSaving] = useState(false)
   const [billingFromDate, setBillingFromDate] = useState(() => dateInputValue())
   const [billingToDate, setBillingToDate] = useState(() => dateInputValue())
   const [selectedPatientId, setSelectedPatientId] = useState('')
@@ -62,10 +69,33 @@ export function BillingPage() {
   const [statusMessage, setStatusMessage] = useState('')
   const [error, setError] = useState('')
   const locale = dateLocale(uiLanguage)
+  useEffect(() => {
+    setPaymentQrDraft(labProfile.paymentQrUrl)
+  }, [labProfile.paymentQrUrl])
+  useEffect(() => {
+    let active = true
+    void listInvoices()
+      .then((invoices) => {
+        if (!active) return
+        setBillingData({ invoices })
+        setBillingLoaded(true)
+      })
+      .catch((loadError: unknown) => {
+        if (active) setError(loadError instanceof Error ? loadError.message : 'Unable to load billing data.')
+      })
+      .finally(() => {
+        if (active) setIsLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
   const today = dateInputValue()
   const monthPrefix = billingToDate.slice(0, 7)
   const selectedMonthIsCurrent = monthPrefix === today.slice(0, 7)
-  const billableTests = store.tests.filter((test) => Number.isFinite(test.price) && test.price > 0)
+  const billableTests = store.tests.filter((test): test is LabTest & { price: number } =>
+    typeof test.price === 'number' && Number.isFinite(test.price) && test.price > 0,
+  )
   const availablePatients = store.patients.filter((item) =>
     !billingData.invoices.some((invoice) => invoice.patientId === item.id && invoice.status === 'Paid'),
   )
@@ -73,8 +103,7 @@ export function BillingPage() {
   const selectedTestRecords = selectedTests
     .map((testId) => billableTests.find((test) => test.id === testId))
     .filter((test): test is NonNullable<typeof test> => Boolean(test))
-  const subTotal = selectedTestRecords.reduce((sum, test) =>
-    sum + (Number.isFinite(test.price) ? Math.max(0, test.price) : 0), 0)
+  const subTotal = selectedTestRecords.reduce((sum, test) => sum + test.price, 0)
   const discountAmount = Number.parseFloat(discount) || 0
   const finalAmount = Math.max(0, subTotal - Math.max(0, discountAmount))
   const summary = billingData.invoices.reduce(
@@ -112,15 +141,39 @@ export function BillingPage() {
     return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(new Date(year, monthNumber - 1, 1))
   }
 
-  function commitBillingData(next: BillingData) {
+  async function updateInvoicePaymentStatus(invoice: BillingInvoice, status: BillingPaymentStatus) {
+    const paymentMethod = status === 'Paid'
+      ? invoice.paymentMethod !== '' ? invoice.paymentMethod : 'Cash'
+      : ''
     try {
-      saveBillingData(next)
-      setBillingData(next)
+      const updatedInvoice = await updateInvoicePayment(invoice.id, status, paymentMethod)
+      setBillingData((current) => ({
+        ...current,
+        invoices: current.invoices.map((item) => item.id === updatedInvoice.id ? updatedInvoice : item),
+      }))
       setError('')
-      return true
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Unable to save billing data.')
-      return false
+      if (status === 'Paid' && selectedPatientId === invoice.patientId) {
+        setSelectedPatientId('')
+        setPatientSearch('')
+        setSelectedTests([])
+      }
+      setStatusMessage(`Invoice ${invoice.id} marked ${status.toLowerCase()}.`)
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'Unable to update invoice payment status.')
+    }
+  }
+
+  async function updateInvoicePaymentMethod(invoice: BillingInvoice, method: BillingPaymentMethod) {
+    if (!isPaymentMethod(method) || !method) return
+    try {
+      const updatedInvoice = await updateInvoicePayment(invoice.id, invoice.status, method)
+      setBillingData((current) => ({
+        ...current,
+        invoices: current.invoices.map((item) => item.id === updatedInvoice.id ? updatedInvoice : item),
+      }))
+      setError('')
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : 'Unable to update invoice payment method.')
     }
   }
 
@@ -160,44 +213,14 @@ export function BillingPage() {
     })
   }
 
-  function updateInvoicePaymentStatus(invoice: BillingInvoice, status: BillingPaymentStatus) {
-    const updatedInvoice: BillingInvoice = {
-      ...invoice,
-      status,
-      paymentMethod: status === 'Paid'
-        ? invoice.paymentMethod !== '' ? invoice.paymentMethod : 'Cash'
-        : '',
-    }
-    if (!commitBillingData({
-      ...billingData,
-      invoices: billingData.invoices.map((item) => item.id === invoice.id ? updatedInvoice : item),
-    })) return
-    if (status === 'Paid' && selectedPatientId === invoice.patientId) {
-      setSelectedPatientId('')
-      setPatientSearch('')
-      setSelectedTests([])
-    }
-    setStatusMessage(`Invoice ${invoice.id} marked ${status.toLowerCase()}.`)
-  }
-
-  function updateInvoicePaymentMethod(invoice: BillingInvoice, method: BillingPaymentMethod) {
-    if (!isPaymentMethod(method) || !method) return
-    commitBillingData({
-      ...billingData,
-      invoices: billingData.invoices.map((item) =>
-        item.id === invoice.id ? { ...item, paymentMethod: method } : item,
-      ),
-    })
-  }
-
   function toggleTest(testId: string, checked: boolean) {
     setSelectedTests((current) => checked
       ? [...new Set([...current, testId])]
       : current.filter((id) => id !== testId))
   }
 
-  function printInvoice(invoice: BillingInvoice) {
-    const printWindow = window.open('', '_blank', 'width=700,height=800')
+  function printInvoice(invoice: BillingInvoice, openedWindow?: Window | null) {
+    const printWindow = openedWindow ?? window.open('', '_blank', 'width=700,height=800')
     if (!printWindow) {
       setError('The invoice window was blocked. Allow pop-ups and try again.')
       return
@@ -205,8 +228,8 @@ export function BillingPage() {
     const itemRows = invoice.items.map((item) =>
       `<div class="row"><span>${escapeHtml(item.name)}</span><strong>₹${item.amount.toFixed(2)}</strong></div>`,
     ).join('')
-    const qrSection = billingData.paymentQr
-      ? `<div class="qr"><strong>Scan to pay</strong><br><img src="${escapeHtml(billingData.paymentQr)}" alt="Payment QR" /></div>`
+    const qrSection = labProfile.paymentQrUrl
+      ? `<div class="qr"><strong>Scan to pay</strong><br><img src="${escapeHtml(labProfile.paymentQrUrl)}" alt="Payment QR" /></div>`
       : ''
     printWindow.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(invoice.id)}</title><style>
       *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#f1f5f9;color:#172033}
@@ -245,15 +268,15 @@ export function BillingPage() {
       `Tests: ${invoice.items.map((item) => item.name).join(', ') || 'Lab tests'}`,
       `Total: ${formatCurrency(invoice.amount)}`,
       `Status: ${invoice.status}`,
-      ...(billingData.paymentQr ? ['PhonePe QR is available on the printed bill.'] : []),
+      ...(labProfile.paymentQrUrl ? ['PhonePe QR is available on the printed bill.'] : []),
     ].join('\n')
     const internationalPhone = phone.startsWith('91') ? phone : `91${phone}`
     window.open(`https://web.whatsapp.com/send?phone=${internationalPhone}&text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer')
     setError('')
-    if (!billingData.paymentQr) return
+    if (!labProfile.paymentQrUrl) return
 
     try {
-      const response = await fetch(billingData.paymentQr)
+      const response = await fetch(labProfile.paymentQrUrl, { credentials: 'same-origin', cache: 'no-store' })
       if (!response.ok) throw new Error('Unable to read the payment QR image.')
       const qrBlob = await response.blob()
       if (navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
@@ -265,7 +288,7 @@ export function BillingPage() {
       console.error('Unable to copy the payment QR image.', qrError)
     }
     const download = document.createElement('a')
-    download.href = billingData.paymentQr
+    download.href = labProfile.paymentQrUrl
     download.download = 'prime-ai-lab-payment-qr.png'
     document.body.appendChild(download)
     download.click()
@@ -276,8 +299,10 @@ export function BillingPage() {
   function handleQrUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
-    if (!file.type.startsWith('image/') || file.size > 4 * 1024 * 1024) {
-      setError('Please choose an image smaller than 4 MB.')
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 4 * 1024 * 1024) {
+      setPaymentQrFile(null)
+      setPaymentQrDraft(labProfile.paymentQrUrl)
+      setError('Please choose a PNG, JPG, or WebP image smaller than 4 MB.')
       event.target.value = ''
       return
     }
@@ -285,28 +310,48 @@ export function BillingPage() {
     reader.onload = () => {
       if (typeof reader.result === 'string') {
         setPaymentQrDraft(reader.result)
+        setPaymentQrFile(file)
         setError('')
       } else {
+        setPaymentQrFile(null)
+        setPaymentQrDraft(labProfile.paymentQrUrl)
         setError('Unable to read the selected payment QR image.')
       }
     }
-    reader.onerror = () => setError('Unable to read the selected payment QR image.')
+    reader.onerror = () => {
+      setPaymentQrFile(null)
+      setPaymentQrDraft(labProfile.paymentQrUrl)
+      setError('Unable to read the selected payment QR image.')
+    }
     reader.readAsDataURL(file)
   }
 
-  function handleSaveQr() {
-    if (!paymentQrDraft) {
+  async function handleSaveQr() {
+    if (!paymentQrFile) {
       setError('Please upload a payment QR image first.')
       return
     }
     setQrSaving(true)
-    const saved = commitBillingData({ ...billingData, paymentQr: paymentQrDraft })
-    if (saved) setStatusMessage('Payment QR saved successfully.')
-    setQrSaving(false)
+    try {
+      const updatedProfile = await uploadLabAsset('payment-qr', paymentQrFile)
+      setLabProfile(updatedProfile)
+      setPaymentQrDraft(updatedProfile.paymentQrUrl)
+      setPaymentQrFile(null)
+      setError('')
+      setStatusMessage('Payment QR saved successfully.')
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Unable to save the payment QR.')
+    } finally {
+      setQrSaving(false)
+    }
   }
 
-  function handleGenerateInvoice(event: FormEvent<HTMLFormElement>) {
+  async function handleGenerateInvoice(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!billingLoaded) {
+      setError('Billing history is not available. Refresh and try again before creating an invoice.')
+      return
+    }
     if (!patient || selectedTestRecords.length === 0) {
       setError('Please select a patient and at least one test.')
       return
@@ -319,31 +364,33 @@ export function BillingPage() {
       setError('Please select a payment method.')
       return
     }
-    const invoice: BillingInvoice = {
-      id: makeId('INV'),
-      patientId: patient.id,
-      patientName: patient.name,
-      patientPhone: patient.phone,
-      items: selectedTestRecords.map((test) => ({
-        testId: test.id,
-        name: test.name,
-        amount: Number.isFinite(test.price) ? Math.max(0, test.price) : 0,
-      })),
-      discount: discountAmount,
-      amount: finalAmount,
-      status: paymentStatus,
-      paymentMethod: paymentStatus === 'Paid' ? paymentMethod : '',
-      date: billingToDate,
+    const printWindow = window.open('', '_blank', 'width=700,height=800')
+    setInvoiceSaving(true)
+    setError('')
+    try {
+      const invoice = await createInvoiceRequest({
+        patientId: patient.id,
+        testIds: selectedTestRecords.map((test) => test.id),
+        discount: discountAmount,
+        status: paymentStatus,
+        paymentMethod: paymentStatus === 'Paid' ? paymentMethod : '',
+        date: billingToDate,
+      })
+      setBillingData((current) => ({ ...current, invoices: [invoice, ...current.invoices] }))
+      setStatusMessage('Invoice created successfully.')
+      setSelectedPatientId('')
+      setPatientSearch('')
+      setSelectedTests([])
+      setDiscount('0')
+      setPaymentStatus('Unpaid')
+      setPaymentMethod('')
+      printInvoice(invoice, printWindow)
+    } catch (createError) {
+      printWindow?.close()
+      setError(createError instanceof Error ? createError.message : 'Unable to create the invoice.')
+    } finally {
+      setInvoiceSaving(false)
     }
-    if (!commitBillingData({ ...billingData, invoices: [invoice, ...billingData.invoices] })) return
-    setStatusMessage('Invoice created successfully.')
-    setSelectedPatientId('')
-    setPatientSearch('')
-    setSelectedTests([])
-    setDiscount('0')
-    setPaymentStatus('Unpaid')
-    setPaymentMethod('')
-    printInvoice(invoice)
   }
 
   function handleExportToTally() {
@@ -408,7 +455,7 @@ export function BillingPage() {
                     aria-label={`Payment status for invoice ${invoice.id}`}
                     value={invoice.status}
                     onChange={(event) => {
-                      if (isPaymentStatus(event.target.value)) updateInvoicePaymentStatus(invoice, event.target.value)
+                      if (isPaymentStatus(event.target.value)) void updateInvoicePaymentStatus(invoice, event.target.value)
                     }}
                   >
                     <option value="Unpaid">Unpaid</option><option value="Paid">Paid</option>
@@ -419,7 +466,7 @@ export function BillingPage() {
                       aria-label={`Payment method for invoice ${invoice.id}`}
                       value={invoice.paymentMethod || 'Cash'}
                       onChange={(event) => {
-                        if (isPaymentMethod(event.target.value)) updateInvoicePaymentMethod(invoice, event.target.value)
+                        if (isPaymentMethod(event.target.value)) void updateInvoicePaymentMethod(invoice, event.target.value)
                       }}
                     >
                       <option value="Cash">Cash</option><option value="Online">Online</option>
@@ -529,11 +576,12 @@ export function BillingPage() {
       <div className="billing-export-controls">
         <label><span>From date</span><input type="date" max={billingToDate} value={billingFromDate} onChange={(event) => { if (event.target.value) setBillingFromDate(event.target.value) }} /></label>
         <label><span>To date</span><input type="date" min={billingFromDate} value={billingToDate} onChange={(event) => { if (event.target.value) setBillingToDate(event.target.value) }} /></label>
-        <button type="button" className="button button-primary" onClick={handleExportToTally}>Export to Tally</button>
+        <button type="button" className="button button-primary" onClick={handleExportToTally} disabled={!billingLoaded}>Export to Tally</button>
       </div>
       </div>
       {error && <div className="billing-message billing-error" role="alert">{error}</div>}
       {statusMessage && <div className="billing-message billing-success" role="status">{statusMessage}</div>}
+      {isLoading && <p role="status">Loading invoices…</p>}
 
       <div className="billing-summary-grid">
         <button type="button" className="billing-summary-card" onClick={() => showBillingDetails('period')}>
@@ -548,17 +596,17 @@ export function BillingPage() {
       </div>
 
       <section className="billing-qr-panel">
-        <div><h2>PhonePe QR</h2><p>Upload or replace the payment QR used on printed invoices.</p></div>
+        <div><h2>PhonePe QR</h2><p>{isOwner ? 'Upload or replace the payment QR used on printed invoices.' : 'Payment QR used on printed invoices.'}</p></div>
         <div className="billing-qr-controls">
           <div className="billing-qr-preview">
             {paymentQrDraft ? <img src={paymentQrDraft} alt="PhonePe payment QR preview" /> : <span>No QR uploaded</span>}
           </div>
-          <div className="billing-qr-upload">
-            <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleQrUpload} aria-label="Upload PhonePe payment QR" />
-            <button type="button" className="button button-outline" onClick={handleSaveQr} disabled={qrSaving || !paymentQrDraft}>
-              {qrSaving ? 'Saving…' : 'Save PhonePe QR'}
-            </button>
-          </div>
+          {isOwner && <div className="billing-qr-upload">
+              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleQrUpload} aria-label="Upload PhonePe payment QR" disabled={isLoading || qrSaving} />
+              <button type="button" className="button button-outline" onClick={() => { void handleSaveQr() }} disabled={isLoading || qrSaving || !paymentQrFile}>
+                {qrSaving ? 'Saving…' : 'Save PhonePe QR'}
+              </button>
+            </div>}
         </div>
       </section>
 
@@ -620,8 +668,10 @@ export function BillingPage() {
               </label>
             )}
             <div className="billing-total-line final"><span>Final Amount</span><strong>{formatCurrency(finalAmount)}</strong></div>
-            <button type="submit" className="button button-primary">Create Invoice</button>
-            <p className="billing-form-note">Invoices are saved in this browser. Do not enter real patient information.</p>
+            <button type="submit" className="button button-primary" disabled={isLoading || !billingLoaded || invoiceSaving}>
+              {invoiceSaving ? 'Creating…' : 'Create Invoice'}
+            </button>
+            <p className="billing-form-note">Invoice records are stored on the lab server. The payment QR remains saved in this browser.</p>
           </form>
         </section>
       </div>

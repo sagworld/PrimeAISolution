@@ -1,6 +1,8 @@
 export { useAiInterpretation } from '@/hooks/useAiInterpretation'
+export { useAsyncAction } from '@/hooks/useAsyncAction'
 export { useAppCore } from '@/hooks/useAppCore'
 export { useAttendance } from '@/hooks/useAttendance'
+export { useAuthentication } from '@/hooks/useAuthentication'
 export { useDashboardData } from '@/hooks/useDashboardData'
 export { useGlobalSearchShortcut } from '@/hooks/useGlobalSearchShortcut'
 export { useLabApp } from '@/hooks/useLabApp'

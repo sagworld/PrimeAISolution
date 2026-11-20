@@ -14,21 +14,25 @@ export function PaymentForm({
   bill: ImportBill
   locale: string
   language: UiLanguage
-  onSave: (billId: string, amount: number, method: PaymentMethod) => void
+  onSave: (billId: string, amount: number, method: PaymentMethod) => void | Promise<void>
   onCancel: () => void
 }) {
   const remaining = getBillRemaining(bill)
   const [amount, setAmount] = useState(String(remaining))
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [error, setError] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
+    setIsSaving(true)
     try {
-      onSave(bill.id, Number(amount), method)
+      await onSave(bill.id, Number(amount), method)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to record this payment.')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -41,8 +45,10 @@ export function PaymentForm({
         <label>Paid by<select value={method} onChange={(event) => setMethod(event.target.value === 'upi' ? 'upi' : 'cash')}><option value="cash">Cash</option><option value="upi">UPI</option></select></label>
         {error && <p className="store-form-error" role="alert">{error}</p>}
         <div className="dialog-actions">
-          <button type="button" className="button button-outline" onClick={onCancel}>Cancel</button>
-          <button type="submit" className="button button-primary">Record payment</button>
+          <button type="button" className="button button-outline" onClick={onCancel} disabled={isSaving}>Cancel</button>
+          <button type="submit" className="button button-primary" disabled={isSaving}>
+            {isSaving ? 'Saving…' : 'Record payment'}
+          </button>
         </div>
       </form>
     </Dialog>

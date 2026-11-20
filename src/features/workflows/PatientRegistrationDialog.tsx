@@ -9,18 +9,18 @@ export function PatientRegistrationDialog({ sampleCollectorMode = false, sampleC
     setPatientDialog(false)
     onEditingComplete?.()
   }
-  const submitPatient = (event: FormEvent<HTMLFormElement>) => {
+  const submitPatient = async (event: FormEvent<HTMLFormElement>) => {
     if (editingPatientId) {
-      if (updatePatient(editingPatientId, event)) onEditingComplete?.()
+      if (await updatePatient(editingPatientId, event)) onEditingComplete?.()
       return
     }
-    addPatient(event, sampleCollectorMode)
+    await addPatient(event)
   }
   return (
     <>
       {patientDialog && <Dialog title={t(editingPatientId ? 'Edit patient details' : 'Register a patient')} onClose={closeDialog} language={uiLanguage}>
         <form className="dialog-form" onSubmit={submitPatient}>
-          <p className="form-intro">{t(editingPatientId ? 'Update patient details and staff assignments.' : 'Create a profile to start adding lab tests. Demo mode only — please use fictional data.')}</p>
+          <p className="form-intro">{t(editingPatientId ? 'Update patient details and staff assignments.' : 'Register a patient profile to start adding lab tests.')}</p>
           <label>{t('Full name')}<input required autoFocus value={patientDraft.name} onChange={(event) => setPatientDraft({ ...patientDraft, name: event.target.value })} placeholder={t('e.g. Maya Sharma')} /></label>
           <div className="form-row"><label>{t('Age')}<input required type="number" min="0" max="120" value={patientDraft.age} onChange={(event) => setPatientDraft({ ...patientDraft, age: event.target.value })} placeholder={t('Age')} /></label><label>{t('Gender')}<select value={patientDraft.gender} onChange={(event) => setPatientDraft({ ...patientDraft, gender: event.target.value })}><option value="Female">{t('Female')}</option><option value="Male">{t('Male')}</option><option value="Other">{t('Other')}</option><option value="Prefer not to say">{t('Prefer not to say')}</option></select></label></div>
           <label>{t('Phone number')}<input required value={patientDraft.phone} onChange={(event) => setPatientDraft({ ...patientDraft, phone: event.target.value })} placeholder="+91 00000 00000" /></label>

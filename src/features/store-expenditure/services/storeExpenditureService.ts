@@ -1,21 +1,14 @@
-import { dateInputValue, makeId } from '@/shared/utils/appUtils'
+import { requestApiJson } from '@/services/apiClient'
 import type {
-  ImportBill,
   BillPayment,
+  ImportBill,
+  PaymentMethod,
   StoreExpenditureData,
   StoreItem,
-  StoreItemCategory,
-  StoreUnit,
-  StockDeductionResult,
-  PaymentMethod,
 } from '@/features/store-expenditure/types'
-import { StoreExpenditureError } from '@/features/store-expenditure/types'
-import { calculateTotalCost, fromScaledInteger, getBillRemaining, normalizeItemName, toScaledInteger } from '@/features/store-expenditure/utils'
 
-const STORAGE_KEY = 'primeaisolution-store-expenditure-v1'
-
-type NewItem = Omit<StoreItem, 'id' | 'createdAt' | 'currentStock'>
-type ItemUpdate = Pick<StoreItem, 'name' | 'category' | 'unit' | 'threshold'>
+type NewItem = Pick<StoreItem, 'name' | 'category' | 'unit' | 'threshold'>
+type ItemUpdate = NewItem
 type NewImport = {
   itemId: string
   supplierName: string
@@ -26,121 +19,137 @@ type NewImport = {
   date: string
 }
 
-type StoredPayment = Omit<BillPayment, 'method'> & { method?: BillPayment['method'] }
-type StoredBill = Omit<ImportBill, 'payments'> & { payments?: StoredPayment[] }
-type StoredData = { items: StoreItem[]; bills: StoredBill[]; deductedOrderIds?: string[] }
-type StockUsage = { itemId: string; quantity: number }
-
-export interface StoreExpenditureService {
-  getSnapshot: () => StoreExpenditureData
-  subscribe: (listener: () => void) => () => void
-  addItem: (draft: NewItem) => void
-  updateItem: (itemId: string, update: ItemUpdate) => void
-  removeItem: (itemId: string) => void
-  recordImport: (draft: NewImport) => ImportBill
-  recordPayment: (billId: string, amount: number, method: PaymentMethod) => void
-  deductStock: (itemId: string, quantity: number) => number
-  deductStockForOrder: (orderId: string, usages: StockUsage[]) => void
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function isUnit(value: unknown): value is StoreUnit {
-  return value === 'quantity' || value === 'kg' || value === 'litre'
+function invalidResponse(): never {
+  throw new Error('The server returned invalid inventory data.')
 }
 
-function isPaymentMethod(value: unknown): value is PaymentMethod {
-  return value === 'cash' || value === 'upi'
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value : invalidResponse()
 }
 
-function isItemCategory(value: unknown): value is StoreItemCategory {
-  return value === 'equipment' || value === 'material'
+function readNumber(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : invalidResponse()
 }
 
-function isNonNegativeNumber(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+function readArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : invalidResponse()
 }
 
-function isPayment(value: unknown): value is StoredPayment {
-  return typeof value === 'object' && value !== null &&
-    'id' in value && typeof value.id === 'string' &&
-    'amount' in value && isNonNegativeNumber(value.amount) &&
-    'paidAt' in value && typeof value.paidAt === 'string' &&
-    (!('method' in value) || isPaymentMethod(value.method) || value.method === 'unspecified')
-}
-
-function isData(value: unknown): value is StoredData {
-  if (typeof value !== 'object' || value === null || !('items' in value) || !('bills' in value)) return false
-  const data = value as { items: unknown; bills: unknown; deductedOrderIds?: unknown }
-  if (!Array.isArray(data.items) || !Array.isArray(data.bills)) return false
-  if ('deductedOrderIds' in data && (!Array.isArray(data.deductedOrderIds) || !data.deductedOrderIds.every((id) => typeof id === 'string'))) return false
-  const items: unknown[] = data.items
-  const bills: unknown[] = data.bills
-  return items.every((item) =>
-      typeof item === 'object' && item !== null &&
-      'id' in item && typeof item.id === 'string' &&
-      'name' in item && typeof item.name === 'string' &&
-      'category' in item && isItemCategory(item.category) &&
-      'unit' in item && isUnit(item.unit) &&
-      'threshold' in item && isNonNegativeNumber(item.threshold) &&
-      'currentStock' in item && isNonNegativeNumber(item.currentStock) &&
-      'createdAt' in item && typeof item.createdAt === 'string',
-    ) &&
-    bills.every((bill) =>
-      typeof bill === 'object' && bill !== null &&
-      'id' in bill && typeof bill.id === 'string' &&
-      'itemId' in bill && typeof bill.itemId === 'string' &&
-      'itemName' in bill && typeof bill.itemName === 'string' &&
-      'supplierName' in bill && typeof bill.supplierName === 'string' &&
-      'quantity' in bill && typeof bill.quantity === 'number' && Number.isFinite(bill.quantity) && bill.quantity > 0 &&
-      'unit' in bill && isUnit(bill.unit) &&
-      'costPerUnit' in bill && isNonNegativeNumber(bill.costPerUnit) &&
-      'totalCost' in bill && isNonNegativeNumber(bill.totalCost) &&
-      'date' in bill && typeof bill.date === 'string' &&
-      'createdAt' in bill && typeof bill.createdAt === 'string' &&
-      (!('payments' in bill) || (Array.isArray(bill.payments) && bill.payments.every(isPayment))),
-    )
-}
-
-function migrateData(data: StoredData): StoreExpenditureData {
-  const importedByItem = new Map<string, number>()
-  for (const bill of data.bills) {
-    importedByItem.set(bill.itemId, (importedByItem.get(bill.itemId) ?? 0) + toScaledInteger(bill.quantity))
+function parseItem(value: unknown): StoreItem {
+  if (!isRecord(value)) return invalidResponse()
+  const category = value.category
+  const unit = value.unit
+  if ((category !== 'equipment' && category !== 'material') ||
+    (unit !== 'quantity' && unit !== 'kg' && unit !== 'litre')) {
+    return invalidResponse()
   }
   return {
-    items: data.items.map((item) => ({
-      ...item,
-      currentStock: fromScaledInteger(Math.min(toScaledInteger(item.currentStock), importedByItem.get(item.id) ?? 0)),
-    })),
-    bills: data.bills.map((bill) => ({
-      ...bill,
-      payments: (bill.payments ?? []).map((payment) => ({
-        ...payment,
-        method: payment.method ?? 'unspecified',
-      })),
-    })),
-    deductedOrderIds: data.deductedOrderIds ?? [],
+    id: readString(value.id),
+    name: readString(value.name),
+    category,
+    unit,
+    threshold: readNumber(value.threshold),
+    currentStock: readNumber(value.currentStock),
+    createdAt: readString(value.createdAt),
   }
 }
 
-function validateNonNegative(value: number, label: string) {
-  if (!Number.isFinite(value) || value < 0 || Math.abs(value * 100 - Math.round(value * 100)) > 1e-8) {
-    throw new StoreExpenditureError('invalid-input', `${label} must be a non-negative number with at most 2 decimal places.`)
+function parsePayment(value: unknown): BillPayment {
+  if (!isRecord(value)) return invalidResponse()
+  const method = value.method
+  if (method !== 'cash' && method !== 'upi' && method !== 'unspecified') return invalidResponse()
+  return {
+    id: readString(value.id),
+    amount: readNumber(value.amount),
+    paidAt: readString(value.paidAt),
+    method,
   }
 }
 
-function validateQuantity(value: number) {
-  if (!Number.isFinite(value) || value <= 0 || Math.abs(value * 100 - Math.round(value * 100)) > 1e-8) {
-    throw new StoreExpenditureError('invalid-input', 'Quantity must be greater than 0 and have at most 2 decimal places.')
+function parseBill(value: unknown): ImportBill {
+  if (!isRecord(value)) return invalidResponse()
+  const itemId = value.itemId
+  const unit = value.unit
+  if (!(itemId === null || typeof itemId === 'string') ||
+    (unit !== 'quantity' && unit !== 'kg' && unit !== 'litre')) {
+    return invalidResponse()
+  }
+  return {
+    id: readString(value.id),
+    itemId,
+    itemName: readString(value.itemName),
+    supplierName: readString(value.supplierName),
+    quantity: readNumber(value.quantity),
+    unit,
+    costPerUnit: readNumber(value.costPerUnit),
+    totalCost: readNumber(value.totalCost),
+    payments: readArray(value.payments).map(parsePayment),
+    date: readString(value.date),
+    createdAt: readString(value.createdAt),
   }
 }
 
-export class LocalStoreExpenditureService implements StoreExpenditureService {
-  private snapshot: StoreExpenditureData
+function parseItems(value: unknown): StoreItem[] {
+  if (!isRecord(value)) return invalidResponse()
+  return readArray(value.items).map(parseItem)
+}
+
+type BillPage = { bills: ImportBill[]; hasMore: boolean; nextOffset: number | null }
+
+function parseBillPage(value: unknown): BillPage {
+  if (!isRecord(value) || !isRecord(value.pagination)) return invalidResponse()
+  const pagination = value.pagination
+  const nextOffset = pagination.nextOffset
+  if (typeof pagination.hasMore !== 'boolean' ||
+    !(nextOffset === null || (typeof nextOffset === 'number' && Number.isInteger(nextOffset)))) {
+    return invalidResponse()
+  }
+  return {
+    bills: readArray(value.bills).map(parseBill),
+    hasMore: pagination.hasMore,
+    nextOffset,
+  }
+}
+
+function parseItemResponse(value: unknown): StoreItem {
+  if (!isRecord(value)) return invalidResponse()
+  return parseItem(value.item)
+}
+
+function parseBillResponse(value: unknown): ImportBill {
+  if (!isRecord(value)) return invalidResponse()
+  return parseBill(value.bill)
+}
+
+function parsePaymentResponse(value: unknown): { id: string; billId: string; amount: number; method: PaymentMethod; paidAt: string } {
+  if (!isRecord(value) || !isRecord(value.payment)) return invalidResponse()
+  const payment = value.payment
+  if (payment.method !== 'cash' && payment.method !== 'upi') return invalidResponse()
+  return {
+    id: readString(payment.id),
+    billId: readString(payment.billId),
+    amount: readNumber(payment.amount),
+    method: payment.method,
+    paidAt: readString(payment.paidAt),
+  }
+}
+
+function parseArchiveResponse(value: unknown): { itemId: string } {
+  if (!isRecord(value)) return invalidResponse()
+  return { itemId: readString(value.itemId) }
+}
+
+const emptyData: StoreExpenditureData = { items: [], bills: [] }
+
+class ApiStoreExpenditureService {
+  private snapshot = emptyData
   private listeners = new Set<() => void>()
-
-  constructor(private readonly storage: Storage = localStorage) {
-    this.snapshot = this.read()
-    window.addEventListener('storage', this.onStorage)
-  }
+  private loaded = false
+  private loading: Promise<void> | null = null
 
   getSnapshot = () => this.snapshot
 
@@ -149,194 +158,122 @@ export class LocalStoreExpenditureService implements StoreExpenditureService {
     return () => this.listeners.delete(listener)
   }
 
-  addItem(draft: NewItem) {
-    const name = normalizeItemName(draft.name)
-    if (!name || !isItemCategory(draft.category) || !isUnit(draft.unit)) {
-      throw new StoreExpenditureError('invalid-input', 'Enter a name, category, and unit.')
-    }
-    validateNonNegative(draft.threshold, 'Threshold')
-    this.assertUniqueName(name)
+  isLoaded() {
+    return this.loaded
+  }
+
+  load(force = false): Promise<void> {
+    if (this.loading) return this.loading
+    if (this.loaded && !force) return Promise.resolve()
+    this.loading = this.fetchData()
+      .then((data) => {
+        this.snapshot = data
+        this.loaded = true
+        this.emit()
+      })
+      .finally(() => {
+        this.loading = null
+      })
+    return this.loading
+  }
+
+  async addItem(draft: NewItem): Promise<void> {
+    const item = await requestApiJson('/api/inventory/items', parseItemResponse, {
+      method: 'POST',
+      body: draft,
+    })
+    this.commit({ ...this.snapshot, items: [...this.snapshot.items, item] })
+  }
+
+  async updateItem(itemId: string, update: ItemUpdate): Promise<void> {
+    const item = await requestApiJson(
+      `/api/inventory/items/${encodeURIComponent(itemId)}`,
+      parseItemResponse,
+      { method: 'PATCH', body: update },
+    )
     this.commit({
       ...this.snapshot,
-      items: [...this.snapshot.items, { ...draft, name, currentStock: 0, id: makeId('item'), createdAt: new Date().toISOString() }],
+      items: this.snapshot.items.map((current) => current.id === item.id ? item : current),
     })
   }
 
-  updateItem(itemId: string, update: ItemUpdate) {
-    const item = this.snapshot.items.find((candidate) => candidate.id === itemId)
-    if (!item) throw new StoreExpenditureError('item-not-found', 'This item no longer exists.')
-    const name = normalizeItemName(update.name)
-    if (!name || !isItemCategory(update.category) || !isUnit(update.unit)) {
-      throw new StoreExpenditureError('invalid-input', 'Enter a name, category, and unit.')
-    }
-    validateNonNegative(update.threshold, 'Threshold')
-    this.assertUniqueName(name, itemId)
-    if (update.unit !== item.unit && this.snapshot.bills.some((bill) => bill.itemId === itemId)) {
-      throw new StoreExpenditureError('invalid-input', 'The unit cannot be changed after an import bill exists.')
-    }
-    this.commit({
-      ...this.snapshot,
-      items: this.snapshot.items.map((candidate) => candidate.id === itemId ? { ...candidate, ...update, name } : candidate),
-    })
+  async removeItem(itemId: string): Promise<void> {
+    const result = await requestApiJson(
+      `/api/inventory/items/${encodeURIComponent(itemId)}`,
+      parseArchiveResponse,
+      { method: 'DELETE' },
+    )
+    this.commit({ ...this.snapshot, items: this.snapshot.items.filter((item) => item.id !== result.itemId) })
   }
 
-  removeItem(itemId: string) {
-    if (!this.snapshot.items.some((item) => item.id === itemId)) {
-      throw new StoreExpenditureError('item-not-found', 'This item no longer exists.')
-    }
-    this.commit({
-      ...this.snapshot,
-      items: this.snapshot.items.filter((item) => item.id !== itemId),
+  async recordImport(draft: NewImport): Promise<void> {
+    const bill = await requestApiJson('/api/import-bills', parseBillResponse, {
+      method: 'POST',
+      body: draft,
     })
-  }
-
-  recordImport(draft: NewImport) {
-    const item = this.snapshot.items.find((candidate) => candidate.id === draft.itemId)
-    if (!item) throw new StoreExpenditureError('item-not-found', 'This item no longer exists.')
-    const supplierName = draft.supplierName.trim()
-    const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(draft.date) ? new Date(`${draft.date}T00:00:00.000Z`) : null
-    const isValidDate = parsedDate !== null && !Number.isNaN(parsedDate.getTime()) && parsedDate.toISOString().slice(0, 10) === draft.date
-    if (!supplierName || !isValidDate) {
-      throw new StoreExpenditureError('invalid-input', 'Supplier and a valid purchase date are required.')
-    }
-    if (draft.date > dateInputValue()) {
-      throw new StoreExpenditureError('invalid-input', 'Purchase date cannot be in the future.')
-    }
-    validateQuantity(draft.quantity)
-    validateNonNegative(draft.costPerUnit, 'Cost per unit')
-    validateNonNegative(draft.amountPaid, 'Amount paid')
-    const totalCost = calculateTotalCost(draft.quantity, draft.costPerUnit)
-    if (toScaledInteger(draft.amountPaid) > toScaledInteger(totalCost)) {
-      throw new StoreExpenditureError('invalid-input', 'Amount paid cannot exceed the bill total.')
-    }
-    const payments: BillPayment[] = draft.amountPaid > 0
-      ? [{ id: makeId('payment'), amount: fromScaledInteger(toScaledInteger(draft.amountPaid)), paidAt: new Date().toISOString(), method: draft.paymentMethod }]
-      : []
-    const bill: ImportBill = {
-      id: makeId('bill'),
-      itemId: item.id,
-      itemName: item.name,
-      supplierName,
-      quantity: fromScaledInteger(toScaledInteger(draft.quantity)),
-      unit: item.unit,
-      costPerUnit: fromScaledInteger(toScaledInteger(draft.costPerUnit)),
-      totalCost,
-      payments,
-      date: draft.date,
-      createdAt: new Date().toISOString(),
-    }
-    const nextStock = fromScaledInteger(toScaledInteger(item.currentStock) + toScaledInteger(draft.quantity))
     this.commit({
-      ...this.snapshot,
-      items: this.snapshot.items.map((candidate) => candidate.id === item.id ? { ...candidate, currentStock: nextStock } : candidate),
+      items: this.snapshot.items.map((item) => item.id === bill.itemId
+        ? { ...item, currentStock: item.currentStock + bill.quantity }
+        : item),
       bills: [...this.snapshot.bills, bill],
     })
-    return bill
   }
 
-  recordPayment(billId: string, amount: number, method: PaymentMethod) {
-    validateNonNegative(amount, 'Payment')
-    if (amount <= 0) throw new StoreExpenditureError('invalid-input', 'Payment must be greater than 0.')
-    if (!isPaymentMethod(method)) throw new StoreExpenditureError('invalid-input', 'Choose Cash or UPI as the payment method.')
-    const bill = this.snapshot.bills.find((candidate) => candidate.id === billId)
-    if (!bill) throw new StoreExpenditureError('bill-not-found', 'This bill no longer exists.')
-    const remaining = getBillRemaining(bill)
-    if (amount > remaining || toScaledInteger(amount) > toScaledInteger(remaining)) {
-      throw new StoreExpenditureError('invalid-input', `Payment cannot exceed the remaining balance of ₹${remaining.toFixed(2)}.`)
-    }
+  async recordPayment(billId: string, amount: number, method: PaymentMethod): Promise<void> {
+    const payment = await requestApiJson(
+      `/api/import-bills/${encodeURIComponent(billId)}/payments`,
+      parsePaymentResponse,
+      { method: 'POST', body: { amount, method } },
+    )
     this.commit({
       ...this.snapshot,
-      bills: this.snapshot.bills.map((candidate) => candidate.id === billId
-        ? { ...candidate, payments: [...candidate.payments, { id: makeId('payment'), amount, paidAt: new Date().toISOString(), method }] }
-        : candidate),
+      bills: this.snapshot.bills.map((bill) => bill.id === payment.billId
+        ? {
+            ...bill,
+            payments: [...bill.payments, {
+              id: payment.id,
+              amount: payment.amount,
+              method: payment.method,
+              paidAt: payment.paidAt,
+            }],
+          }
+        : bill),
     })
   }
 
-  deductStock(itemId: string, quantity: number) {
-    validateQuantity(quantity)
-    const item = this.snapshot.items.find((candidate) => candidate.id === itemId)
-    if (!item) throw new StoreExpenditureError('item-not-found', 'This item no longer exists.')
-    const remaining = toScaledInteger(item.currentStock) - toScaledInteger(quantity)
-    if (remaining < 0) throw new StoreExpenditureError('insufficient-stock', `Insufficient stock. Only ${item.currentStock} ${item.unit} available.`)
-    const remainingStock = fromScaledInteger(remaining)
-    this.commit({
-      ...this.snapshot,
-      items: this.snapshot.items.map((candidate) => candidate.id === itemId ? { ...candidate, currentStock: remainingStock } : candidate),
-    })
-    return remainingStock
+  private async fetchData(): Promise<StoreExpenditureData> {
+    const [items, bills] = await Promise.all([
+      requestApiJson('/api/inventory/items', parseItems),
+      this.fetchBills(),
+    ])
+    return { items, bills }
   }
 
-  deductStockForOrder(orderId: string, usages: StockUsage[]) {
-    if (!orderId.trim()) throw new StoreExpenditureError('invalid-input', 'A test order is required to deduct reagent stock.')
-    if (this.snapshot.deductedOrderIds.includes(orderId)) return
-    if (!usages.length) throw new StoreExpenditureError('invalid-input', 'At least one reagent usage is required.')
-
-    const quantities = new Map<string, number>()
-    for (const usage of usages) {
-      validateQuantity(usage.quantity)
-      const current = quantities.get(usage.itemId) ?? 0
-      quantities.set(usage.itemId, fromScaledInteger(toScaledInteger(current) + toScaledInteger(usage.quantity)))
-    }
-
-    const remaining = new Map<string, number>()
-    for (const [itemId, quantity] of quantities) {
-      const item = this.snapshot.items.find((candidate) => candidate.id === itemId)
-      if (!item) throw new StoreExpenditureError('item-not-found', 'A reagent item no longer exists in inventory.')
-      const nextStock = toScaledInteger(item.currentStock) - toScaledInteger(quantity)
-      if (nextStock < 0) throw new StoreExpenditureError('insufficient-stock', `Insufficient stock for ${item.name}. Only ${item.currentStock} ${item.unit} available.`)
-      remaining.set(itemId, fromScaledInteger(nextStock))
-    }
-
-    this.commit({
-      ...this.snapshot,
-      items: this.snapshot.items.map((item) => {
-        const currentStock = remaining.get(item.id)
-        return currentStock === undefined ? item : { ...item, currentStock }
-      }),
-      deductedOrderIds: [...this.snapshot.deductedOrderIds, orderId],
-    })
-  }
-
-  private assertUniqueName(name: string, exceptId?: string) {
-    const normalized = name.toLocaleLowerCase()
-    if (this.snapshot.items.some((item) => item.id !== exceptId && item.name.toLocaleLowerCase() === normalized)) {
-      throw new StoreExpenditureError('duplicate-name', 'An item with this name already exists.')
+  private async fetchBills(): Promise<ImportBill[]> {
+    const bills: ImportBill[] = []
+    let offset = 0
+    while (true) {
+      const page = await requestApiJson(
+        `/api/import-bills?limit=100&offset=${offset}`,
+        parseBillPage,
+      )
+      bills.push(...page.bills)
+      if (!page.hasMore) return bills
+      if (page.nextOffset === null || page.nextOffset <= offset || page.nextOffset > 10_000) {
+        throw new Error('The import bill list exceeds the supported result limit.')
+      }
+      offset = page.nextOffset
     }
   }
 
-  private read(): StoreExpenditureData {
-    try {
-      const saved = this.storage.getItem(STORAGE_KEY)
-      if (!saved) return { items: [], bills: [], deductedOrderIds: [] }
-      const parsed: unknown = JSON.parse(saved)
-      if (isData(parsed)) return migrateData(parsed)
-      console.error('Saved store and expenditure data has an invalid shape.')
-    } catch (error) {
-      console.error('Unable to load store and expenditure data.', error)
-    }
-    return { items: [], bills: [], deductedOrderIds: [] }
+  private commit(data: StoreExpenditureData) {
+    this.snapshot = data
+    this.emit()
   }
 
-  private commit(next: StoreExpenditureData) {
-    this.storage.setItem(STORAGE_KEY, JSON.stringify(next))
-    this.snapshot = next
-    for (const listener of this.listeners) listener()
-  }
-
-  private onStorage = (event: StorageEvent) => {
-    if (event.key !== STORAGE_KEY) return
-    this.snapshot = this.read()
+  private emit() {
     for (const listener of this.listeners) listener()
   }
 }
 
-export const storeExpenditureService = new LocalStoreExpenditureService()
-
-export function deductStock(itemId: string, quantity: number): StockDeductionResult {
-  try {
-    return { ok: true, remainingStock: storeExpenditureService.deductStock(itemId, quantity) } as const
-  } catch (error) {
-    if (error instanceof StoreExpenditureError) return { ok: false, error: error.message } as const
-    throw error
-  }
-}
+export const storeExpenditureService = new ApiStoreExpenditureService()

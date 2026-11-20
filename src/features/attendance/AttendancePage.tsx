@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppContext } from '@/context/useAppContext'
 import { dateLocale } from '@/i18n'
 import { Dialog } from '@/shared/components'
@@ -6,11 +6,11 @@ import type { AttendanceStatus } from '@/shared/types'
 
 export function AttendancePage() {
   const {
-    store, uiLanguage, section, administrationTab, headAuthenticated, headUsername, setHeadUsername,
-    headPassword, setHeadPassword, headLoginError, attendanceStartDate,
+    store, uiLanguage, section, administrationTab, isOwner, attendanceStartDate,
     attendanceEndDate, attendanceMarkDate, setAttendanceMarkDate,
+    loadAttendanceRange,
     attendanceInfoTechnicianId, setAttendanceInfoTechnicianId,
-    t, loginHead, saveTechnicianAttendance,
+    t, saveTechnicianAttendance,
   } = useAppContext()
   const [attendanceDrafts, setAttendanceDrafts] = useState<Record<string, Record<string, AttendanceStatus | ''>>>({})
   const [attendanceInfoMonth, setAttendanceInfoMonth] = useState(() => {
@@ -37,6 +37,13 @@ export function AttendancePage() {
   const [attendanceInfoYear, attendanceInfoMonthNumber] = attendanceInfoMonth.split('-').map(Number)
   const attendanceInfoMonthStart = new Date(attendanceInfoYear, attendanceInfoMonthNumber - 1, 1)
   const attendanceInfoMonthDays = new Date(attendanceInfoYear, attendanceInfoMonthNumber, 0).getDate()
+  useEffect(() => {
+    if (isOwner && section === 'administration' && administrationTab === 'attendance') {
+      const from = `${attendanceInfoMonth}-01`
+      const to = `${attendanceInfoMonth}-${String(attendanceInfoMonthDays).padStart(2, '0')}`
+      void loadAttendanceRange(from, to)
+    }
+  }, [administrationTab, attendanceInfoMonth, attendanceInfoMonthDays, isOwner, loadAttendanceRange, section])
   const attendanceInfoMonthRecords = attendanceInfoTechnician
     ? store.attendance.filter((record) =>
       record.labTechnicianId === attendanceInfoTechnician.id && record.date.startsWith(attendanceInfoMonth),
@@ -57,10 +64,10 @@ export function AttendancePage() {
     ...Array.from({ length: attendanceInfoMonthStart.getDay() }, () => null),
     ...Array.from({ length: attendanceInfoMonthDays }, (_, index) => index + 1),
   ]
-  const attendanceHistory = [...new Set(store.attendance.map((record) => record.date))]
+  const attendanceHistory = [...new Set(attendanceRangeRecords.map((record) => record.date))]
     .sort((first, second) => first.localeCompare(second))
     .map((date) => {
-      const records = store.attendance.filter((record) => record.date === date)
+      const records = attendanceRangeRecords.filter((record) => record.date === date)
       const namesForStatus = (status: AttendanceStatus) => records
         .filter((record) => record.status === status)
         .map((record) => store.labTechnicians.find((technician) => technician.id === record.labTechnicianId)?.name ?? t('Unknown technician'))
@@ -73,23 +80,7 @@ export function AttendancePage() {
     })
   return (
     <>
-          {section === 'administration' && !headAuthenticated && (
-            <section className="page-section">
-              <div className="page-heading"><div><span className="eyebrow">{t('RESTRICTED AREA')}</span><h1>{t('Administration login')}</h1><p>{t('Log in to access the Administration modules.')}</p></div></div>
-              <div className="attendance-login-card panel">
-                <form className="dialog-form" onSubmit={loginHead}>
-                  <p className="form-intro">{t('Only authorized administration users should sign in.')}</p>
-                  <label>{t('Username')}<input required autoComplete="username" value={headUsername} onChange={(event) => setHeadUsername(event.target.value)} /></label>
-                  <label>{t('Password')}<input required type="password" autoComplete="current-password" value={headPassword} onChange={(event) => setHeadPassword(event.target.value)} /></label>
-                  {headLoginError && <p className="attendance-login-error" role="alert">{headLoginError}</p>}
-                  <button type="submit" className="button button-primary">{t('Log in')}</button>
-                </form>
-                <p className="attendance-security-note">{t('Demo login only: it is not secure authentication and does not protect browser data.')}</p>
-              </div>
-            </section>
-          )}
-
-          {section === 'administration' && administrationTab === 'attendance' && headAuthenticated && (
+          {section === 'administration' && administrationTab === 'attendance' && isOwner && (
             <section className="page-section">
               <div className="result-cards attendance-summary">
                 <div className="result-card"><span className="result-number">{attendanceRangeRecords.filter((record) => record.status === 'Present').length}</span><span>{t('Present')}</span></div>
@@ -118,20 +109,19 @@ export function AttendancePage() {
                   {!store.labTechnicians.length && <tr><td className="empty-cell" colSpan={4}>{t('No lab technicians found.')}</td></tr>}
                 </tbody></table>
                 </div>
-                <div className="table-footer"><span>{store.labTechnicians.length} {t('Lab technicians').toLowerCase()}</span><span>{t('Attendance is stored in this browser.')}</span></div>
+                <div className="table-footer"><span>{store.labTechnicians.length} {t('Lab technicians').toLowerCase()}</span><span>{t('Attendance is stored in the lab database.')}</span></div>
               </div>
               <section className="panel attendance-history-panel">
-                <div className="panel-heading"><div><h2>{t('Attendance history')}</h2><p>{t('All saved attendance records by date.')}</p></div></div>
+                <div className="panel-heading"><div><h2>{t('Attendance history')}</h2><p>{t('Attendance records within the selected date range.')}</p></div></div>
                 {attendanceHistory.length
                   ? <div className="attendance-history-table-wrap"><table className="attendance-history-table"><thead><tr><th>{t('Date')}</th><th>{t('Present (P)')}</th><th>{t('Absent (A)')}</th><th>{t('Leave (L)')}</th><th>{t('Edit')}</th></tr></thead><tbody>
                       {attendanceHistory.map((day) => <tr key={day.date}><td>{new Intl.DateTimeFormat(dateLocale(uiLanguage), { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${day.date}T00:00:00`))}</td><td>{day.present.join(', ') || '—'}</td><td>{day.absent.join(', ') || '—'}</td><td>{day.leave.join(', ') || '—'}</td><td><button type="button" className="button button-small button-outline" aria-label={`${t('Edit attendance for')} ${day.date}`} onClick={() => { setAttendanceMarkDate(day.date); document.getElementById('attendance-register')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}>{t('Edit')}</button></td></tr>)}
                     </tbody></table></div>
                   : <p className="empty-message">{t('No attendance records saved yet.')}</p>}
               </section>
-              <p className="demo-notice">{t('Demo login only: it is not secure authentication and does not protect browser data.')}</p>
             </section>
           )}
-          {attendanceInfoTechnician && section === 'administration' && administrationTab === 'attendance' && headAuthenticated && (
+          {attendanceInfoTechnician && section === 'administration' && administrationTab === 'attendance' && isOwner && (
             <Dialog
               title={`${t('Attendance summary')} · ${attendanceInfoTechnician.name}`}
               onClose={() => setAttendanceInfoTechnicianId(null)}

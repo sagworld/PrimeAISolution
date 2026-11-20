@@ -1,4 +1,4 @@
-# Frontend architecture
+# Application architecture
 
 The frontend is organized around a shared application context and feature-owned
 pages. Local section selection remains state-driven; the application does not
@@ -19,6 +19,15 @@ use a router.
   types, initial data, and domain helpers.
 - `src/services/` contains browser persistence and API response handling.
 - `src/styles/App.css` contains the existing application styles.
+
+## Cloudflare backend (in development)
+
+- `worker/` contains the Cloudflare Worker API entry point.
+- `wrangler.jsonc` configures the Worker and its local D1 binding.
+- `migrations/` is the configured location for versioned D1 SQL migrations.
+- The Worker currently runs separately from Vite and exposes only a database
+  health check. Frontend features are not connected to it yet; production is
+  planned to serve the Vite build and API from Cloudflare on the same origin.
 
 ## Store & Expenditure
 

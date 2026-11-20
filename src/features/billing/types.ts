@@ -2,7 +2,7 @@ export type BillingPaymentStatus = 'Paid' | 'Unpaid'
 export type BillingPaymentMethod = 'Cash' | 'Online' | ''
 
 export type BillingInvoiceItem = {
-  testId: string
+  testId: string | null
   name: string
   amount: number
 }
@@ -22,5 +22,4 @@ export type BillingInvoice = {
 
 export type BillingData = {
   invoices: BillingInvoice[]
-  paymentQr: string
 }

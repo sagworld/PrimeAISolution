@@ -43,7 +43,7 @@ export function PatientReportDialog({ sampleCollectorMode = false }: { sampleCol
         {reportPdfError && <p className="ai-error" role="alert">{t(reportPdfError)}</p>}
         <div className={`printable-report${reportHeaderEnabled ? ' has-lab-header' : ''}`} ref={reportRef}>
           {reportHeaderEnabled ? <div className="lab-report-header">
-            {labProfile.logoDataUrl ? <img className="lab-report-logo" src={labProfile.logoDataUrl} alt={t('Lab logo')} /> : <span className="brand-mark"><Icon name="flask" size={28} /></span>}
+            {labProfile.logoUrl ? <img className="lab-report-logo" src={labProfile.logoUrl} alt={t('Lab logo')} /> : <span className="brand-mark"><Icon name="flask" size={28} /></span>}
             <div className="lab-report-heading"><h2>{labProfile.name || 'PRIME AI LAB'}</h2><p>{labProfile.address}</p><p>{labProfile.mobile}</p><strong>{t('LABORATORY TEST REPORT')}</strong></div>
           </div> : <div className="report-brand"><span className="brand-mark"><Icon name="flask" size={19} /></span><div><strong>PRIME AI LAB</strong><small>{t('LABORATORY TEST REPORT')}</small></div></div>}
           <div className="report-patient-info"><div><small>{t('PATIENT NAME')}</small><strong>{selectedReportPatient.name}</strong></div><div><small>{t('PATIENT ID')}</small><strong>{selectedReportPatient.id}</strong></div><div><small>{t('AGE / GENDER')}</small><strong>{selectedReportPatient.age} {t('yrs')} / {t(selectedReportPatient.gender)}</strong></div><div><small>{t('REPORT DATE')}</small><strong>{formatDate(new Date().toISOString(), uiLanguage)}</strong></div><div><small>{t('SAMPLE COLLECTOR')}</small><strong>{getSampleCollector(store, selectedReportPatient.sampleCollectorId)}</strong></div>{!reportHeaderEnabled && <><div><small>{t('LAB TECHNICIAN')}</small><strong>{getLabTechnician(store, selectedReportPatient.labTechnicianId)}</strong></div><div><small>{t('REFERRED BY')}</small><strong>{getReferrer(store, selectedReportPatient.referrerId)}</strong></div></>}</div>
@@ -63,7 +63,7 @@ export function PatientReportDialog({ sampleCollectorMode = false }: { sampleCol
             </section>
           })}</div>
           {reportHeaderEnabled ? <div className="lab-report-footer">
-            <div className="lab-report-signature">{labProfile.signatureDataUrl && <img src={labProfile.signatureDataUrl} alt={t('Owner digital signature')} />}<strong>{labProfile.ownerName || t('Owner')}</strong><small>{t('Owner')}</small></div>
+            <div className="lab-report-signature">{labProfile.signatureUrl && <img src={labProfile.signatureUrl} alt={t('Owner digital signature')} />}<strong>{labProfile.ownerName || t('Owner')}</strong><small>{t('Owner')}</small></div>
             <div><strong>{getReferrer(store, selectedReportPatient.referrerId)}</strong><small>{t('Referred by')}</small></div>
             <div><strong>{getLabTechnician(store, selectedReportPatient.labTechnicianId)}</strong><small>{t('Lab technician')}</small></div>
           </div> : <><div className="report-signoff"><span>{t('Authorized by: ____________________')}</span><span>{t('Signature: ____________________')}</span></div><p className="report-footer-note">{t('Confidential laboratory record · Prepared for professional review')}</p></>}

@@ -1,2 +1,9 @@
 export { readApiJson } from '@/services/aiService'
-export { readAppearance, readStore, readUiLanguage } from '@/services/browserStorage'
+export { ApiError, requestApiJson } from '@/services/apiClient'
+export {
+  getCurrentSession,
+  signIn,
+  signOut,
+} from '@/services/authService'
+export type { AuthenticatedUser, AuthRole, AuthSession } from '@/services/authService'
+export { readAppearance, readUiLanguage } from '@/services/browserStorage'

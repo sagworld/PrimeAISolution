@@ -15,7 +15,7 @@ export function ImportForm({
   item: StoreItem
   suppliers: string[]
   language: UiLanguage
-  onSave: (draft: { itemId: string; supplierName: string; quantity: number; costPerUnit: number; amountPaid: number; paymentMethod: PaymentMethod; date: string }) => void
+  onSave: (draft: { itemId: string; supplierName: string; quantity: number; costPerUnit: number; amountPaid: number; paymentMethod: PaymentMethod; date: string }) => void | Promise<void>
   onCancel: () => void
 }) {
   const [supplierName, setSupplierName] = useState('')
@@ -25,15 +25,19 @@ export function ImportForm({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
   const [date, setDate] = useState(dateInputValue())
   const [error, setError] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
   const totalCost = calculateTotalCost(Number(quantity) || 0, Number(costPerUnit) || 0)
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
+    setIsSaving(true)
     try {
-      onSave({ itemId: item.id, supplierName, quantity: Number(quantity), costPerUnit: Number(costPerUnit), amountPaid: Number(amountPaid), paymentMethod, date })
+      await onSave({ itemId: item.id, supplierName, quantity: Number(quantity), costPerUnit: Number(costPerUnit), amountPaid: Number(amountPaid), paymentMethod, date })
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to record this import.')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -50,8 +54,10 @@ export function ImportForm({
         <div className="store-cost-preview"><span>Total cost<br />Remaining after payment</span><strong>{formatStoreCurrency(totalCost, dateLocale(language))}<br />{formatStoreCurrency(Math.max(0, totalCost - (Number(amountPaid) || 0)), dateLocale(language))}</strong></div>
         {error && <p className="store-form-error" role="alert">{error}</p>}
         <div className="dialog-actions">
-          <button type="button" className="button button-outline" onClick={onCancel}>Cancel</button>
-          <button type="submit" className="button button-primary">Record import</button>
+          <button type="button" className="button button-outline" onClick={onCancel} disabled={isSaving}>Cancel</button>
+          <button type="submit" className="button button-primary" disabled={isSaving}>
+            {isSaving ? 'Saving…' : 'Record import'}
+          </button>
         </div>
       </form>
     </Dialog>

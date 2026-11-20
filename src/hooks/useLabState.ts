@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { type UiLanguage } from '@/i18n'
 import type {
   AppearanceSettings,
@@ -14,21 +14,17 @@ import type {
   TestProfile,
 } from '@/shared/types'
 import { dateInputValue, explanationLanguage } from '@/shared/utils/appUtils'
-import { readAppearance, readLabProfile, readStore, readUiLanguage } from '@/services/browserStorage'
-import { LAB_PROFILE_STORAGE_KEY, STORAGE_KEY } from '@/shared/data/initialStore'
+import { readAppearance, readUiLanguage } from '@/services/browserStorage'
+import { emptyLabProfile, emptyStore } from '@/shared/data/emptyStore'
 import { translate } from '@/i18n'
 
 export function useLabState() {
-  const [store, setStore] = useState<Store>(readStore)
-  const [labProfile, setLabProfile] = useState<LabProfile>(readLabProfile)
+  const [store, setStore] = useState<Store>(emptyStore)
+  const [labProfile, setLabProfile] = useState<LabProfile>(emptyLabProfile)
   const [uiLanguage, setUiLanguage] = useState<UiLanguage>(readUiLanguage)
   const [appearance, setAppearance] = useState<AppearanceSettings>(readAppearance)
   const [section, setSection] = useState<Section>('overview')
   const [administrationTab, setAdministrationTab] = useState<AdministrationTab>('attendance')
-  const [headAuthenticated, setHeadAuthenticated] = useState(false)
-  const [headUsername, setHeadUsername] = useState('')
-  const [headPassword, setHeadPassword] = useState('')
-  const [headLoginError, setHeadLoginError] = useState('')
   const [attendanceStartDate, setAttendanceStartDate] = useState(() => dateInputValue())
   const [attendanceEndDate, setAttendanceEndDate] = useState(() => dateInputValue())
   const [attendanceMarkDate, setAttendanceMarkDate] = useState(() => dateInputValue())
@@ -62,22 +58,14 @@ export function useLabState() {
   const [reagentDrafts, setReagentDrafts] = useState<{ itemId: string; quantity: string }[]>([])
   const [resultDrafts, setResultDrafts] = useState<Record<string, string>>({})
   const [toast, setToast] = useState('')
-  const t = (text: string) => translate(uiLanguage, text)
-
-  useEffect(() => {
-    const syncWorkspaceFromOtherTab = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY || event.key === null) setStore(readStore())
-      if (event.key === LAB_PROFILE_STORAGE_KEY || event.key === null) setLabProfile(readLabProfile())
-    }
-    window.addEventListener('storage', syncWorkspaceFromOtherTab)
-    return () => window.removeEventListener('storage', syncWorkspaceFromOtherTab)
-  }, [])
+  const [dataLoading, setDataLoading] = useState(false)
+  const [dataError, setDataError] = useState('')
+  const t = useCallback((text: string) => translate(uiLanguage, text), [uiLanguage])
 
   return {
     store, setStore, labProfile, setLabProfile, uiLanguage, setUiLanguage, appearance, setAppearance, section, setSection,
     administrationTab, setAdministrationTab,
-    headAuthenticated, setHeadAuthenticated, headUsername, setHeadUsername, headPassword, setHeadPassword,
-    headLoginError, setHeadLoginError, attendanceStartDate, setAttendanceStartDate,
+    attendanceStartDate, setAttendanceStartDate,
     attendanceEndDate, setAttendanceEndDate, attendanceMarkDate, setAttendanceMarkDate,
     attendanceInfoTechnicianId, setAttendanceInfoTechnicianId,
     masterTab, setMasterTab,
@@ -92,7 +80,7 @@ export function useLabState() {
     setSelectedTestProfile, selectedTestIds, setSelectedTestIds, patientDraft, setPatientDraft,
     masterDraft, setMasterDraft, parameterDrafts, setParameterDrafts, reagentDrafts, setReagentDrafts,
     resultDrafts, setResultDrafts,
-    toast, setToast, t,
+    toast, setToast, dataLoading, setDataLoading, dataError, setDataError, t,
   }
 }
 

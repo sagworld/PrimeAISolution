@@ -1,11 +1,7 @@
 import type { AccentTheme, LabTest, Store, TestParameter, TestProfile } from '@/shared/types'
 
-export const STORAGE_KEY = 'primeaisolution-lab-v1'
 export const UI_LANGUAGE_STORAGE_KEY = 'primeaisolution-ui-language'
 export const APPEARANCE_STORAGE_KEY = 'primeaisolution-appearance'
-export const LAB_PROFILE_STORAGE_KEY = 'primeaisolution-lab-profile-v1'
-export const HEAD_USERNAME = 'head'
-export const HEAD_PASSWORD = 'lab123'
 export const accentThemes: { id: AccentTheme; label: string; color: string }[] = [
   { id: 'mint', label: 'Mint', color: '#168466' },
   { id: 'blue', label: 'Ocean blue', color: '#3478c4' },

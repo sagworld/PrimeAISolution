@@ -22,36 +22,45 @@ export function StoreExpenditurePage() {
   const [importingItem, setImportingItem] = useState<StoreItem | null>(null)
   const [payingBill, setPayingBill] = useState<ImportBill | null>(null)
   const [viewingBill, setViewingBill] = useState<ImportBill | null>(null)
+  const [actionError, setActionError] = useState('')
   const locale = uiLanguage === 'mr' ? 'mr-IN' : uiLanguage === 'hi' ? 'hi-IN' : 'en-IN'
   const totalExpenditure = inventory.items.reduce((sum, item) => sum + item.totalExpenditure, 0)
 
-  function saveItem(draft: { name: string; category: 'equipment' | 'material'; unit: 'quantity' | 'kg' | 'litre'; threshold: number }) {
+  async function saveItem(draft: { name: string; category: 'equipment' | 'material'; unit: 'quantity' | 'kg' | 'litre'; threshold: number }) {
     if (editingItem) {
-      inventory.updateItem(editingItem.id, { name: draft.name, category: draft.category, unit: draft.unit, threshold: draft.threshold })
+      await inventory.updateItem(editingItem.id, { name: draft.name, category: draft.category, unit: draft.unit, threshold: draft.threshold })
     } else {
-      inventory.addItem(draft)
+      await inventory.addItem(draft)
     }
+    setActionError('')
     setAddingItem(false)
     setEditingItem(null)
     notify(editingItem ? 'Item updated.' : 'Item added.')
   }
 
-  function saveImport(draft: { itemId: string; supplierName: string; quantity: number; costPerUnit: number; amountPaid: number; paymentMethod: PaymentMethod; date: string }) {
-    bills.recordImport(draft)
+  async function saveImport(draft: { itemId: string; supplierName: string; quantity: number; costPerUnit: number; amountPaid: number; paymentMethod: PaymentMethod; date: string }) {
+    await bills.recordImport(draft)
+    setActionError('')
     setImportingItem(null)
     notify('Import recorded.')
   }
 
-  function savePayment(billId: string, amount: number, method: PaymentMethod) {
-    bills.recordPayment(billId, amount, method)
+  async function savePayment(billId: string, amount: number, method: PaymentMethod) {
+    await bills.recordPayment(billId, amount, method)
+    setActionError('')
     setPayingBill(null)
     notify('Payment recorded.')
   }
 
-  function removeItem(item: InventoryRow) {
+  async function removeItem(item: InventoryRow) {
     if (!window.confirm(`Remove "${item.name}" from inventory? Its import bills will remain in history, but its remaining stock will no longer be tracked.`)) return
-    inventory.removeItem(item.id)
-    notify('Item removed from inventory.')
+    setActionError('')
+    try {
+      await inventory.removeItem(item.id)
+      notify('Item removed from inventory.')
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Unable to remove this item.')
+    }
   }
 
   return section === 'store-expenditure' ? (
@@ -60,6 +69,10 @@ export function StoreExpenditurePage() {
         <button type="button" className={view === 'inventory' ? 'selected' : ''} aria-pressed={view === 'inventory'} onClick={() => setView('inventory')}>Inventory</button>
         <button type="button" className={view === 'bills' ? 'selected' : ''} aria-pressed={view === 'bills'} onClick={() => setView('bills')}>Import Bills</button>
       </div>
+      {(inventory.error || bills.error || actionError) && (
+        <p className="store-form-error" role="alert">{actionError || inventory.error || bills.error}</p>
+      )}
+      {(inventory.isLoading || bills.isLoading) && <p role="status">Loading inventory and import bills…</p>}
       {view === 'inventory'
         ? <InventoryTable items={inventory.items} totalExpenditure={totalExpenditure} locale={locale} search={inventory.search} lowStockOnly={inventory.lowStockOnly} onSearchChange={inventory.setSearch} onLowStockChange={inventory.setLowStockOnly} onAdd={() => setAddingItem(true)} onImport={(item) => setImportingItem(item)} onEdit={(item) => setEditingItem(item)} onRemove={removeItem} />
         : <BillsTable bills={bills.bills} groupedBills={bills.groupedBills} groupBy={bills.groupBy} filters={bills.filters} itemNames={bills.itemNames} suppliers={bills.suppliers} totalCost={bills.totals.totalCost} totalPaid={bills.totals.totalPaid} remaining={bills.totals.remaining} totalQuantity={bills.totals.quantity} totalUnit={bills.totals.unit} locale={locale} onItemNameChange={bills.setItemName} onSupplierChange={bills.setSupplierName} onFromChange={bills.setFrom} onToChange={bills.setTo} onGroupByChange={bills.setGroupBy} onStatusChange={bills.setStatus} onClearFilters={bills.clearFilters} onRecordPayment={setPayingBill} onViewBill={setViewingBill} />}

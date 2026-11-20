@@ -20,7 +20,7 @@ export function AddItemForm({
   item: StoreItem | null
   unitLocked: boolean
   language: UiLanguage
-  onSave: (draft: ItemDraft) => void
+  onSave: (draft: ItemDraft) => void | Promise<void>
   onCancel: () => void
 }) {
   const [name, setName] = useState(item?.name ?? '')
@@ -28,14 +28,18 @@ export function AddItemForm({
   const [unit, setUnit] = useState<StoreUnit>(item?.unit ?? 'quantity')
   const [threshold, setThreshold] = useState(String(item?.threshold ?? 0))
   const [error, setError] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
+    setIsSaving(true)
     try {
-      onSave({ name, category, unit, threshold: Number(threshold) })
+      await onSave({ name, category, unit, threshold: Number(threshold) })
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to save this item.')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -52,8 +56,10 @@ export function AddItemForm({
         <label>Low-stock threshold<input required type="number" min="0" step="0.01" value={threshold} onChange={(event) => setThreshold(event.target.value)} /></label>
         {error && <p className="store-form-error" role="alert">{error}</p>}
         <div className="dialog-actions">
-          <button type="button" className="button button-outline" onClick={onCancel}>Cancel</button>
-          <button type="submit" className="button button-primary">{item ? 'Save changes' : 'Add item'}</button>
+          <button type="button" className="button button-outline" onClick={onCancel} disabled={isSaving}>Cancel</button>
+          <button type="submit" className="button button-primary" disabled={isSaving}>
+            {isSaving ? 'Saving…' : item ? 'Save changes' : 'Add item'}
+          </button>
         </div>
       </form>
     </Dialog>

@@ -5,7 +5,7 @@ import { RevenueBreakdownPanel } from '@/shared/components/RevenueBreakdownPanel
 import { formatRevenue } from '@/shared/utils/appUtils'
 
 export function RevenuePage() {
-  const { uiLanguage, section, administrationTab, headAuthenticated, revenueCategory, setRevenueCategory, revenueFromDate, setRevenueFromDate, revenueToDate, setRevenueToDate, t, revenueOrders, revenueTotal, unpricedRevenueOrders, doctorRevenue, technicianRevenue, collectorRevenue } = useAppContext()
+  const { uiLanguage, section, administrationTab, isOwner, revenueCategory, setRevenueCategory, revenueFromDate, setRevenueFromDate, revenueToDate, setRevenueToDate, t, revenueOrders, revenueTotal, unpricedRevenueOrders, doctorRevenue, technicianRevenue, collectorRevenue } = useAppContext()
   const [revenueNameSearch, setRevenueNameSearch] = useState('')
   const selectedBreakdown = revenueCategory === 'doctor'
     ? { title: t('Doctor / referrer'), rows: doctorRevenue }
@@ -19,7 +19,7 @@ export function RevenuePage() {
   }
   return (
     <>
-          {section === 'administration' && administrationTab === 'revenue' && headAuthenticated && (
+          {section === 'administration' && administrationTab === 'revenue' && isOwner && (
             <section className="page-section">
               <div className="revenue-category-toolbar">
                 <div className="tab-bar revenue-category-tabs" role="tablist" aria-label={t('Revenue categories')}>

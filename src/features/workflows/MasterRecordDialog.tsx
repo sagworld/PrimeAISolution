@@ -6,7 +6,7 @@ import { unitLabel } from '@/features/store-expenditure/utils'
 
 export function MasterRecordDialog() {
   const { uiLanguage, masterDialog, setMasterDialog, masterDraft, setMasterDraft, parameterDrafts, setParameterDrafts, reagentDrafts, setReagentDrafts, t, addMaster, masterTabDetails } = useAppContext()
-  const { items: inventoryItems } = useInventory()
+  const { items: inventoryItems, isLoading: inventoryLoading, error: inventoryError } = useInventory()
   const availableReagents = inventoryItems.filter((item) => item.category === 'material')
   return (
     <>
@@ -43,6 +43,8 @@ export function MasterRecordDialog() {
             </div>
             <div className="test-parameter-editor reagent-editor">
               <div className="parameter-editor-heading"><strong>{t('Reagents used for test')}</strong><button type="button" className="button button-small button-outline" disabled={!availableReagents.length} onClick={() => setReagentDrafts((drafts) => [...drafts, { itemId: '', quantity: '' }])}><Icon name="plus" size={13} /> {t('Add reagent')}</button></div>
+              {inventoryError && <p className="store-form-error" role="alert">{inventoryError}</p>}
+              {inventoryLoading && <p className="form-intro" role="status">{t('Loading inventory items…')}</p>}
               <div className="reagent-draft-list">
               {!availableReagents.length && <p className="form-intro">{t('Add material items in inventory before configuring reagents.')}</p>}
               {reagentDrafts.map((reagent, index) => {

@@ -1,11 +1,11 @@
 import type { FormEvent } from 'react'
-import type { LabOrder, LabTest, MasterTab, Patient } from '@/shared/types'
+import type { MasterTab } from '@/shared/types'
 import { belongsToProfile } from '@/shared/data/initialStore'
-import { makeId, nextRecordId } from '@/shared/utils/appUtils'
 import type { LabAppState } from '@/hooks/useLabState'
 import type { AppCoreActions } from '@/hooks/useAppCore'
+import { createMaster, createOrders, createPatient, createTest, updatePatient as updatePatientApi } from '@/services/labService'
 
-export function useLabWorkflows(state: LabAppState, { persist, notify }: AppCoreActions) {
+export function useLabWorkflows(state: LabAppState, { updateStore, notify }: AppCoreActions) {
   const {
     store, selectedPatientId, selectedTestProfile, selectedTestIds, patientDraft, masterDialog,
     masterDraft, parameterDrafts, reagentDrafts, generationPatientId, setTestDialog, setSelectedPatientId,
@@ -28,54 +28,59 @@ export function useLabWorkflows(state: LabAppState, { persist, notify }: AppCore
     setMasterDialog(tab)
   }
 
-  const addPatient = (event: FormEvent<HTMLFormElement>, createdBySampleCollector = false) => {
+  const addPatient = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const patient: Patient = {
-      id: nextRecordId('PT-', store.patients.map((item) => item.id), 4),
-      name: patientDraft.name.trim(),
-      age: Number(patientDraft.age),
-      gender: patientDraft.gender,
-      phone: patientDraft.phone.trim(),
-      labTechnicianId: patientDraft.labTechnicianId,
-      sampleCollectorId: patientDraft.sampleCollectorId,
-      referrerId: patientDraft.referrerId,
-      createdBySampleCollector,
-      createdAt: new Date().toISOString(),
+    try {
+      const patient = await createPatient({
+        name: patientDraft.name.trim(),
+        age: Number(patientDraft.age),
+        gender: patientDraft.gender,
+        phone: patientDraft.phone.trim(),
+        labTechnicianId: patientDraft.labTechnicianId,
+        sampleCollectorId: patientDraft.sampleCollectorId,
+        referrerId: patientDraft.referrerId,
+      })
+      updateStore((current) => ({ ...current, patients: [patient, ...current.patients] }))
+      setPatientDraft({ name: '', age: '', gender: 'Female', phone: '', labTechnicianId: '', sampleCollectorId: '', referrerId: '' })
+      setPatientDialog(false)
+      notify('Patient registered successfully.')
+    } catch (reason) {
+      notify(reason instanceof Error ? reason.message : 'Unable to register this patient.')
     }
-    persist({ ...store, patients: [patient, ...store.patients] })
-    setPatientDraft({ name: '', age: '', gender: 'Female', phone: '', labTechnicianId: '', sampleCollectorId: '', referrerId: '' })
-    setPatientDialog(false)
-    notify('Patient registered successfully.')
   }
 
-  const updatePatient = (patientId: string, event: FormEvent<HTMLFormElement>) => {
+  const updatePatient = async (patientId: string, event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const currentPatient = store.patients.find((patient) => patient.id === patientId)
     if (!currentPatient) {
       notify('Patient record could not be found.')
       return false
     }
-    const updatedPatient: Patient = {
-      ...currentPatient,
-      name: patientDraft.name.trim(),
-      age: Number(patientDraft.age),
-      gender: patientDraft.gender,
-      phone: patientDraft.phone.trim(),
-      labTechnicianId: patientDraft.labTechnicianId,
-      sampleCollectorId: currentPatient.createdBySampleCollector ? currentPatient.sampleCollectorId : patientDraft.sampleCollectorId,
-      referrerId: currentPatient.createdBySampleCollector ? currentPatient.referrerId : patientDraft.referrerId,
+    try {
+      const updatedPatient = await updatePatientApi(patientId, {
+        name: patientDraft.name.trim(),
+        age: Number(patientDraft.age),
+        gender: patientDraft.gender,
+        phone: patientDraft.phone.trim(),
+        labTechnicianId: patientDraft.labTechnicianId,
+        sampleCollectorId: currentPatient.createdBySampleCollector ? currentPatient.sampleCollectorId : patientDraft.sampleCollectorId,
+        referrerId: currentPatient.createdBySampleCollector ? currentPatient.referrerId : patientDraft.referrerId,
+      })
+      updateStore((current) => ({
+        ...current,
+        patients: current.patients.map((patient) => patient.id === patientId ? updatedPatient : patient),
+      }))
+      setPatientDraft({ name: '', age: '', gender: 'Female', phone: '', labTechnicianId: '', sampleCollectorId: '', referrerId: '' })
+      setPatientDialog(false)
+      notify('Patient details updated successfully.')
+      return true
+    } catch (reason) {
+      notify(reason instanceof Error ? reason.message : 'Unable to update this patient.')
+      return false
     }
-    persist({
-      ...store,
-      patients: store.patients.map((patient) => patient.id === patientId ? updatedPatient : patient),
-    })
-    setPatientDraft({ name: '', age: '', gender: 'Female', phone: '', labTechnicianId: '', sampleCollectorId: '', referrerId: '' })
-    setPatientDialog(false)
-    notify('Patient details updated successfully.')
-    return true
   }
 
-  const addTestOrder = (event: FormEvent<HTMLFormElement>) => {
+  const addTestOrder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!selectedPatientId || !selectedTestProfile) {
       notify('Select a patient, profile and at least one test.')
@@ -86,76 +91,78 @@ export function useLabWorkflows(state: LabAppState, { persist, notify }: AppCore
       notify('Select a patient, profile and at least one test.')
       return
     }
-    const existingIds = store.orders.map((item) => item.id)
-    const createdAt = new Date().toISOString()
-    const newOrders = selectedTestIds.reduce<LabOrder[]>((orders, testId) => {
-      orders.push({
-        id: nextRecordId('ORD-', [...existingIds, ...orders.map((order) => order.id)], 3),
-        patientId: selectedPatientId,
-        testId,
-        createdAt,
-        result: '',
-        parameterResults: {},
-        status: 'Pending',
-      })
-      return orders
-    }, [])
-    persist({ ...store, orders: [...newOrders, ...store.orders] })
-    setTestDialog(false)
-    setSelectedTestIds([])
-    notify(`${newOrders.length} test${newOrders.length === 1 ? '' : 's'} added to the patient queue.`)
+    try {
+      const newOrders = await createOrders(selectedPatientId, selectedTestProfile, selectedTestIds)
+      updateStore((current) => ({ ...current, orders: [...newOrders, ...current.orders] }))
+      setTestDialog(false)
+      setSelectedTestIds([])
+      notify(`${newOrders.length} test${newOrders.length === 1 ? '' : 's'} added to the patient queue.`)
+    } catch (reason) {
+      notify(reason instanceof Error ? reason.message : 'Unable to add these tests.')
+    }
   }
 
-  const addMaster = (event: FormEvent<HTMLFormElement>) => {
+  const addMaster = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (masterDialog === 'lab-technicians') {
-      persist({ ...store, labTechnicians: [{ id: makeId('tech'), name: masterDraft.name.trim(), specialty: masterDraft.specialty.trim(), phone: masterDraft.phone.trim() }, ...store.labTechnicians] })
-    } else if (masterDialog === 'referrers') {
-      persist({ ...store, referrers: [{ id: makeId('ref'), name: masterDraft.name.trim(), organization: masterDraft.organization.trim(), phone: masterDraft.phone.trim() }, ...store.referrers] })
-    } else if (masterDialog === 'sample-collectors') {
-      persist({ ...store, sampleCollectors: [{ id: makeId('collector'), name: masterDraft.name.trim(), phone: masterDraft.phone.trim() }, ...store.sampleCollectors] })
-    } else if (masterDialog === 'tests') {
-      if (reagentDrafts.some((reagent) => !reagent.itemId || !reagent.quantity.trim() || !Number.isFinite(Number(reagent.quantity)) || Number(reagent.quantity) <= 0 || Math.abs(Number(reagent.quantity) * 100 - Math.round(Number(reagent.quantity) * 100)) > 1e-8)) {
-        notify('Select a reagent and enter a valid quantity used.')
-        return
-      }
-      const testId = makeId('test')
-      let parameterIndex = 0
-      const parameters = parameterDrafts.flatMap((group, groupIndex) => {
-        const groupName = group.isGroup ? group.name.trim() : ''
-        const groupId = groupName ? `${testId}-group-${groupIndex + 1}` : ''
-        return group.parameters.map((parameter) => {
-          parameterIndex += 1
-          return {
-            id: `${makeId('parameter')}-${parameterIndex}`,
-            name: parameter.name.trim(),
-            unit: parameter.unit.trim(),
-            reference: parameter.reference.trim(),
-            ...(groupId ? { groupId, groupName } : {}),
-          }
+    try {
+      if (masterDialog === 'lab-technicians') {
+        const record = await createMaster('lab-technicians', {
+          name: masterDraft.name.trim(),
+          specialty: masterDraft.specialty.trim(),
+          phone: masterDraft.phone.trim(),
         })
-      }).filter((parameter) => parameter.name)
-      if (!parameters.length) {
-        notify('Add at least one named test parameter.')
-        return
+        updateStore((current) => ({ ...current, labTechnicians: [record, ...current.labTechnicians] }))
+      } else if (masterDialog === 'referrers') {
+        const record = await createMaster('referrers', {
+          name: masterDraft.name.trim(),
+          organization: masterDraft.organization.trim(),
+          phone: masterDraft.phone.trim(),
+        })
+        updateStore((current) => ({ ...current, referrers: [record, ...current.referrers] }))
+      } else if (masterDialog === 'sample-collectors') {
+        const record = await createMaster('sample-collectors', {
+          name: masterDraft.name.trim(),
+          phone: masterDraft.phone.trim(),
+        })
+        updateStore((current) => ({ ...current, sampleCollectors: [record, ...current.sampleCollectors] }))
+      } else if (masterDialog === 'tests') {
+        if (reagentDrafts.some((reagent) => !reagent.itemId || !reagent.quantity.trim() || !Number.isFinite(Number(reagent.quantity)) || Number(reagent.quantity) <= 0 || Math.abs(Number(reagent.quantity) * 100 - Math.round(Number(reagent.quantity) * 100)) > 1e-8)) {
+          notify('Select a reagent and enter a valid quantity used.')
+          return
+        }
+        const parameterGroups = parameterDrafts.map((group) => ({
+          name: group.isGroup ? group.name.trim() : '',
+          parameters: group.parameters
+            .filter((parameter) => parameter.name.trim())
+            .map((parameter) => ({
+              name: parameter.name.trim(),
+              unit: parameter.unit.trim(),
+              reference: parameter.reference.trim(),
+            })),
+        })).filter((group) => group.parameters.length > 0)
+        if (!parameterGroups.length) {
+          notify('Add at least one named test parameter.')
+          return
+        }
+        const test = await createTest({
+          name: masterDraft.name.trim(),
+          category: masterDraft.category.trim(),
+          price: Number(masterDraft.price),
+          profiles: [],
+          parameterGroups,
+          reagents: reagentDrafts.map((reagent) => ({ itemId: reagent.itemId, quantity: Number(reagent.quantity) })),
+        })
+        updateStore((current) => ({ ...current, tests: [test, ...current.tests] }))
       }
-      const test: LabTest = {
-        id: testId,
-        name: masterDraft.name.trim(),
-        category: masterDraft.category.trim(),
-        price: Number(masterDraft.price),
-        unit: '',
-        reference: '',
-        parameters,
-        reagents: reagentDrafts.map((reagent) => ({ itemId: reagent.itemId, quantity: Number(reagent.quantity) })),
-      }
-      persist({ ...store, tests: [test, ...store.tests] })
+      if (!masterDialog) return
+      setMasterDialog(null)
+      setMasterDraft({ name: '', specialty: '', organization: '', phone: '', category: '', price: '' })
+      setParameterDrafts([{ name: '', isGroup: false, parameters: [{ name: '', unit: '', reference: '' }] }])
+      setReagentDrafts([])
+      notify('Master record added.')
+    } catch (reason) {
+      notify(reason instanceof Error ? reason.message : 'Unable to add this master record.')
     }
-    setMasterDialog(null)
-    setMasterDraft({ name: '', specialty: '', organization: '', phone: '', category: '', price: '' })
-    setParameterDrafts([{ name: '', isGroup: false, parameters: [{ name: '', unit: '', reference: '' }] }])
-    setReagentDrafts([])
-    notify('Master record added.')
   }
 
   const selectedProfileTests = selectedTestProfile

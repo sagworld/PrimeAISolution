@@ -1,14 +1,11 @@
-import { useMemo, useState, useSyncExternalStore } from 'react'
+import { useMemo, useState } from 'react'
 import { storeExpenditureService } from '@/features/store-expenditure/services/storeExpenditureService'
 import type { BillStatusFilter, BillsGroupBy } from '@/features/store-expenditure/types'
 import { filterImportBills, getBillTotals, getItemNames, getSuppliers, groupImportBills } from '@/features/store-expenditure/utils'
+import { useStoreExpenditureData } from '@/features/store-expenditure/hooks/useStoreExpenditureData'
 
 export function useImportBills() {
-  const data = useSyncExternalStore(
-    storeExpenditureService.subscribe,
-    storeExpenditureService.getSnapshot,
-    storeExpenditureService.getSnapshot,
-  )
+  const { data, isLoading, error } = useStoreExpenditureData()
   const [itemName, setItemName] = useState('')
   const [supplierName, setSupplierName] = useState('')
   const [from, setFrom] = useState('')
@@ -22,6 +19,8 @@ export function useImportBills() {
 
   return {
     bills: filteredBills,
+    isLoading,
+    error,
     groupedBills: groupBy === 'none' ? [] : groupImportBills(filteredBills, groupBy),
     groupBy,
     setGroupBy,

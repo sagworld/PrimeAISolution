@@ -26,7 +26,7 @@ export type BillStatusFilter = 'all' | BillPaymentStatus
 
 export type ImportBill = {
   id: string
-  itemId: string
+  itemId: string | null
   itemName: string
   supplierName: string
   quantity: number
@@ -41,28 +41,6 @@ export type ImportBill = {
 export type StoreExpenditureData = {
   items: StoreItem[]
   bills: ImportBill[]
-  deductedOrderIds: string[]
 }
 
 export type InventoryRow = StoreItem & { usedQuantity: number; totalExpenditure: number }
-
-export type StockDeductionResult =
-  | { ok: true; remainingStock: number }
-  | { ok: false; error: string }
-
-export type StoreExpenditureErrorCode =
-  | 'invalid-input'
-  | 'duplicate-name'
-  | 'item-not-found'
-  | 'insufficient-stock'
-  | 'bill-not-found'
-
-export class StoreExpenditureError extends Error {
-  constructor(
-    public readonly code: StoreExpenditureErrorCode,
-    message: string,
-  ) {
-    super(message)
-    this.name = 'StoreExpenditureError'
-  }
-}
