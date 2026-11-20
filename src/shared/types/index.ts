@@ -1,4 +1,4 @@
-export type Section = 'overview' | 'masters' | 'patients' | 'administration' | 'results' | 'report-generation' | 'reports' | 'store-expenditure' | 'billing'
+export type Section = 'overview' | 'masters' | 'patients' | 'administration' | 'results' | 'report-generation' | 'reports' | 'store-expenditure' | 'billing' | 'lab-settings'
 export type AdministrationTab = 'attendance' | 'revenue'
 export type MasterTab = 'lab-technicians' | 'referrers' | 'sample-collectors' | 'tests'
 export type ReportPeriod = 'Daily' | 'Weekly' | 'Monthly'
@@ -11,6 +11,14 @@ export type AttendanceStatus = 'Present' | 'Absent' | 'Leave'
 export type AppearanceMode = 'light' | 'dark'
 export type AccentTheme = 'mint' | 'blue' | 'violet' | 'rose'
 export type AppearanceSettings = { mode: AppearanceMode; accent: AccentTheme }
+export type LabProfile = {
+  name: string
+  address: string
+  ownerName: string
+  mobile: string
+  logoDataUrl: string
+  signatureDataUrl: string
+}
 export type RevenueSummaryRow = { id: string; name: string; orders: number; amount: number }
 export type LabTechnician = { id: string; name: string; specialty: string; phone: string }
 export type Referrer = { id: string; name: string; organization: string; phone: string }

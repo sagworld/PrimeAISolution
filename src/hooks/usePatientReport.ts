@@ -20,7 +20,7 @@ function preparePatientReportFile(pdfBlob: Blob, filename: string): PreparedPati
 
 export function usePatientReport(state: LabAppState, { persist, notify }: AppCoreActions) {
   const {
-    store, uiLanguage, aiInterpretation, aiLoading, aiError, reportPatientId, reportOrderIds, reportRef, setSharingReport,
+    store, labProfile, uiLanguage, reportHeaderEnabled, aiInterpretation, aiLoading, aiError, reportPatientId, reportOrderIds, reportRef, setSharingReport,
     setReportOrderIds, setReportPatientId, setAiInterpretation, setAiError, t,
   } = state
   const selectedReportPatient = reportPatientId
@@ -33,6 +33,8 @@ export function usePatientReport(state: LabAppState, { persist, notify }: AppCor
   const reportContentKey = JSON.stringify({
     patient: selectedReportPatient,
     orders: selectedPatientOrders,
+    labProfile,
+    reportHeaderEnabled,
     uiLanguage,
     aiInterpretation,
     aiLoading,

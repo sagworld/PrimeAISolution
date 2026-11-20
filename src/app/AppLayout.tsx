@@ -7,6 +7,7 @@ import type { Patient } from '@/shared/types'
 import {
   AttendancePage,
   BillingPage,
+  LabSettingsPage,
   MastersPage,
   OverviewPage,
   PatientsPage,
@@ -76,6 +77,7 @@ export function AppLayout() {
             <button className={`nav-item ${section === 'reports' ? 'active' : ''}`} onClick={() => setSection('reports')}><Icon name="report" /><span>{t('Reports')}</span></button>
             <button className={`nav-item ${section === 'billing' ? 'active' : ''}`} onClick={() => setSection('billing')}><Icon name="report" /><span>{t('Billing')}</span></button>
             <button className={`nav-item ${section === 'store-expenditure' ? 'active' : ''}`} onClick={() => setSection('store-expenditure')}><Icon name="masters" /><span>{t('Store & Expenditure')}</span></button>
+            <button className={`nav-item ${section === 'lab-settings' ? 'active' : ''}`} onClick={() => setSection('lab-settings')}><Icon name="masters" /><span>{t('Lab settings')}</span></button>
           </> : (
             <button className={`nav-item ${section === 'patients' ? 'active' : ''}`} onClick={() => setSection('patients')}><Icon name="patients" /><span>{t('Patients')}</span><span className="nav-count">{store.patients.length}</span></button>
           )}
@@ -90,7 +92,7 @@ export function AppLayout() {
 
       <main className={`main-panel ${section === 'store-expenditure' ? 'store-expenditure-main' : ''}`}>
         <header className="topbar">
-          <div className="breadcrumbs"><span>Prime AI Lab</span><span className="crumb-slash">/</span><strong>{t(section === 'overview' ? 'Overview' : section === 'results' ? 'Test results' : section === 'report-generation' ? 'Report generation' : section === 'masters' ? 'Masters' : section === 'patients' ? 'Patients' : section === 'administration' ? 'Administration' : section === 'billing' ? 'Billing' : section === 'store-expenditure' ? 'Store & Expenditure' : 'Reports')}</strong></div>
+          <div className="breadcrumbs"><span>Prime AI Lab</span><span className="crumb-slash">/</span><strong>{t(section === 'overview' ? 'Overview' : section === 'results' ? 'Test results' : section === 'report-generation' ? 'Report generation' : section === 'masters' ? 'Masters' : section === 'patients' ? 'Patients' : section === 'administration' ? 'Administration' : section === 'billing' ? 'Billing' : section === 'store-expenditure' ? 'Store & Expenditure' : section === 'lab-settings' ? 'Lab settings' : 'Reports')}</strong></div>
           <div className="topbar-actions">
             {workspaceRole === 'lab-technician' && <>
               <label className="global-search"><Icon name="search" size={17} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('Search patients, tests...')} aria-label={t('Search patients and tests')} /><kbd>⌘ K</kbd></label>
@@ -161,6 +163,7 @@ export function AppLayout() {
             <RevenuePage />
             <BillingPage />
             <StoreExpenditurePage />
+            {section === 'lab-settings' && <LabSettingsPage />}
           </>}
         </div>
       </main>

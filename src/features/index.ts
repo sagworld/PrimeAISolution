@@ -1,5 +1,6 @@
 export { AttendancePage } from '@/features/attendance/AttendancePage'
 export { BillingPage } from '@/features/billing'
+export { LabSettingsPage } from '@/features/lab-settings/LabSettingsPage'
 export { MastersPage } from '@/features/masters/MastersPage'
 export { OverviewPage } from '@/features/overview/OverviewPage'
 export { PatientsPage } from '@/features/patients/PatientsPage'

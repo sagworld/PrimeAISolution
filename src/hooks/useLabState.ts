@@ -6,6 +6,7 @@ import type {
   ExplanationLanguage,
   MasterTab,
   OrderStatusFilter,
+  LabProfile,
   ReportPeriod,
   RevenueCategory,
   Section,
@@ -13,12 +14,13 @@ import type {
   TestProfile,
 } from '@/shared/types'
 import { dateInputValue, explanationLanguage } from '@/shared/utils/appUtils'
-import { readAppearance, readStore, readUiLanguage } from '@/services/browserStorage'
-import { STORAGE_KEY } from '@/shared/data/initialStore'
+import { readAppearance, readLabProfile, readStore, readUiLanguage } from '@/services/browserStorage'
+import { LAB_PROFILE_STORAGE_KEY, STORAGE_KEY } from '@/shared/data/initialStore'
 import { translate } from '@/i18n'
 
 export function useLabState() {
   const [store, setStore] = useState<Store>(readStore)
+  const [labProfile, setLabProfile] = useState<LabProfile>(readLabProfile)
   const [uiLanguage, setUiLanguage] = useState<UiLanguage>(readUiLanguage)
   const [appearance, setAppearance] = useState<AppearanceSettings>(readAppearance)
   const [section, setSection] = useState<Section>('overview')
@@ -43,6 +45,7 @@ export function useLabState() {
   const [masterDialog, setMasterDialog] = useState<MasterTab | null>(null)
   const [reportPatientId, setReportPatientId] = useState<string | null>(null)
   const [reportOrderIds, setReportOrderIds] = useState<string[] | null>(null)
+  const [reportHeaderEnabled, setReportHeaderEnabled] = useState(true)
   const [generationPatientId, setGenerationPatientId] = useState('')
   const [aiLanguage, setAiLanguage] = useState<ExplanationLanguage>(() => explanationLanguage(uiLanguage))
   const [aiInterpretation, setAiInterpretation] = useState<{ text: string; model: string } | null>(null)
@@ -62,16 +65,16 @@ export function useLabState() {
   const t = (text: string) => translate(uiLanguage, text)
 
   useEffect(() => {
-    const syncStoreFromOtherTab = (event: StorageEvent) => {
-      if (event.key !== STORAGE_KEY && event.key !== null) return
-      setStore(readStore())
+    const syncWorkspaceFromOtherTab = (event: StorageEvent) => {
+      if (event.key === STORAGE_KEY || event.key === null) setStore(readStore())
+      if (event.key === LAB_PROFILE_STORAGE_KEY || event.key === null) setLabProfile(readLabProfile())
     }
-    window.addEventListener('storage', syncStoreFromOtherTab)
-    return () => window.removeEventListener('storage', syncStoreFromOtherTab)
+    window.addEventListener('storage', syncWorkspaceFromOtherTab)
+    return () => window.removeEventListener('storage', syncWorkspaceFromOtherTab)
   }, [])
 
   return {
-    store, setStore, uiLanguage, setUiLanguage, appearance, setAppearance, section, setSection,
+    store, setStore, labProfile, setLabProfile, uiLanguage, setUiLanguage, appearance, setAppearance, section, setSection,
     administrationTab, setAdministrationTab,
     headAuthenticated, setHeadAuthenticated, headUsername, setHeadUsername, headPassword, setHeadPassword,
     headLoginError, setHeadLoginError, attendanceStartDate, setAttendanceStartDate,
@@ -82,7 +85,8 @@ export function useLabState() {
     revenueFromDate, setRevenueFromDate, revenueToDate, setRevenueToDate,
     orderStatusFilter, setOrderStatusFilter, search, setSearch, patientDialog, setPatientDialog,
     testDialog, setTestDialog, masterDialog, setMasterDialog, reportPatientId, setReportPatientId,
-    reportOrderIds, setReportOrderIds, generationPatientId, setGenerationPatientId, aiLanguage, setAiLanguage,
+    reportOrderIds, setReportOrderIds, reportHeaderEnabled, setReportHeaderEnabled,
+    generationPatientId, setGenerationPatientId, aiLanguage, setAiLanguage,
     aiInterpretation, setAiInterpretation, aiLoading, setAiLoading, aiError, setAiError, sharingReport,
     setSharingReport, reportRef, selectedPatientId, setSelectedPatientId, selectedTestProfile,
     setSelectedTestProfile, selectedTestIds, setSelectedTestIds, patientDraft, setPatientDraft,

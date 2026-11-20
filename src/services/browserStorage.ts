@@ -1,6 +1,64 @@
 import type { UiLanguage } from '@/i18n'
-import type { AppearanceSettings, LabOrder, LabTechnician, LabTest, PersistedPatient, Referrer, Store, TestReagentUsage } from '@/shared/types'
-import { APPEARANCE_STORAGE_KEY, initialStore, STORAGE_KEY, UI_LANGUAGE_STORAGE_KEY } from '@/shared/data/initialStore'
+import type { AppearanceSettings, LabOrder, LabProfile, LabTechnician, LabTest, PersistedPatient, Referrer, Store, TestReagentUsage } from '@/shared/types'
+import { APPEARANCE_STORAGE_KEY, initialStore, LAB_PROFILE_STORAGE_KEY, STORAGE_KEY, UI_LANGUAGE_STORAGE_KEY } from '@/shared/data/initialStore'
+
+const emptyLabProfile: LabProfile = {
+  name: '',
+  address: '',
+  ownerName: '',
+  mobile: '',
+  logoDataUrl: '',
+  signatureDataUrl: '',
+}
+const maxImageDataUrlLength = 700_000
+
+function isLabImage(value: unknown): value is string {
+  return value === '' ||
+    (typeof value === 'string' && value.length <= maxImageDataUrlLength &&
+      /^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/.test(value))
+}
+
+function isLabProfile(value: unknown): value is LabProfile {
+  if (typeof value !== 'object' || value === null) return false
+  return 'name' in value && typeof value.name === 'string' && value.name.length <= 120 &&
+    'address' in value && typeof value.address === 'string' && value.address.length <= 500 &&
+    'ownerName' in value && typeof value.ownerName === 'string' && value.ownerName.length <= 120 &&
+    'mobile' in value && typeof value.mobile === 'string' && value.mobile.length <= 40 &&
+    'logoDataUrl' in value && isLabImage(value.logoDataUrl) &&
+    'signatureDataUrl' in value && isLabImage(value.signatureDataUrl)
+}
+
+export function readLabProfile(): LabProfile {
+  try {
+    const saved = localStorage.getItem(LAB_PROFILE_STORAGE_KEY)
+    if (!saved) return emptyLabProfile
+    const parsed: unknown = JSON.parse(saved)
+    if (isLabProfile(parsed)) return parsed
+    console.error('Saved lab profile settings are invalid.')
+  } catch (error) {
+    console.error('Unable to load lab profile settings.', error)
+  }
+  return emptyLabProfile
+}
+
+export function saveLabProfile(profile: LabProfile): void {
+  if (!isLabProfile(profile) || !profile.name.trim() || !profile.address.trim() ||
+    !profile.ownerName.trim() || !profile.mobile.trim()) {
+    throw new Error('Enter the lab name, address, owner name, and mobile number.')
+  }
+  try {
+    localStorage.setItem(LAB_PROFILE_STORAGE_KEY, JSON.stringify({
+      ...profile,
+      name: profile.name.trim(),
+      address: profile.address.trim(),
+      ownerName: profile.ownerName.trim(),
+      mobile: profile.mobile.trim(),
+    }))
+  } catch (error) {
+    console.error('Unable to save lab profile settings.', error)
+    throw new Error('Could not save lab settings in this browser.')
+  }
+}
 
 export function readUiLanguage(): UiLanguage {
   try {
